@@ -12,6 +12,7 @@ import { DollarSign, TrendingUp, History, Settings } from 'lucide-react';
 import { CreditCard, RewardRedemption } from '@/types';
 import { DEFAULT_CATEGORIES } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 
 interface CashBackManagerProps {
   card: CreditCard;
@@ -24,7 +25,10 @@ export default function CashBackManager({ card, onCardUpdate }: CashBackManagerP
   const [redemptionAmount, setRedemptionAmount] = useState('');
   const [redemptionMethod, setRedemptionMethod] = useState('');
   const [redemptionNotes, setRedemptionNotes] = useState('');
-  const [categoryRates, setCategoryRates] = useState(card.categoryRewards || {});
+  const [categoryRates, setCategoryRates] = useState(card.categoryRewards || DEFAULT_CATEGORIES.reduce((acc, cat) => ({
+    ...acc,
+    [cat.id]: { type: 'cashback', rate: 1 }
+  }), {}));
   const { toast } = useToast();
 
   const handleRedeem = () => {
@@ -129,27 +133,71 @@ export default function CashBackManager({ card, onCardUpdate }: CashBackManagerP
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
-                  {DEFAULT_CATEGORIES.map((category) => (
-                    <div key={category.id} className="flex items-center justify-between">
-                      <Label htmlFor={category.id}>{category.name}</Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id={category.id}
-                          type="number"
-                          step="0.25"
-                          min="0"
-                          max="10"
-                          className="w-20"
-                          value={categoryRates[category.id] || 1}
-                          onChange={(e) => setCategoryRates({
-                            ...categoryRates,
-                            [category.id]: parseFloat(e.target.value) || 1
-                          })}
-                        />
-                        <span className="text-sm text-muted-foreground">%</span>
+                  {DEFAULT_CATEGORIES.map((category) => {
+                    const categoryReward = categoryRates[category.id] || { type: 'cashback', rate: 1 };
+                    return (
+                      <div key={category.id} className="space-y-3 p-4 border rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <Label className="font-medium">{category.name}</Label>
+                          <Select 
+                            value={categoryReward.type} 
+                            onValueChange={(value: 'cashback' | 'points' | 'miles') => setCategoryRates({
+                              ...categoryRates,
+                              [category.id]: { ...categoryReward, type: value }
+                            })}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="cashback">Cash Back</SelectItem>
+                              <SelectItem value="points">Points</SelectItem>
+                              <SelectItem value="miles">Miles</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm">
+                              {categoryReward.type === 'cashback' ? 'Percentage (%)' : 'Multiplier (x)'}
+                            </Label>
+                            <Input
+                              type="number"
+                              step={categoryReward.type === 'cashback' ? '0.25' : '0.5'}
+                              min="0"
+                              max={categoryReward.type === 'cashback' ? '10' : '20'}
+                              value={categoryReward.rate}
+                              onChange={(e) => setCategoryRates({
+                                ...categoryRates,
+                                [category.id]: { 
+                                  ...categoryReward, 
+                                  rate: parseFloat(e.target.value) || 1 
+                                }
+                              })}
+                            />
+                          </div>
+                          
+                          {(categoryReward.type === 'points' || categoryReward.type === 'miles') && (
+                            <div>
+                              <Label className="text-sm">Ratio (optional)</Label>
+                              <Input
+                                placeholder="e.g., $1 = 2 points"
+                                value={categoryReward.ratio || ''}
+                                onChange={(e) => setCategoryRates({
+                                  ...categoryRates,
+                                  [category.id]: { 
+                                    ...categoryReward, 
+                                    ratio: e.target.value || undefined 
+                                  }
+                                })}
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   <Button onClick={handleUpdateRates} className="w-full">
                     Update Rates
                   </Button>
@@ -236,15 +284,51 @@ export default function CashBackManager({ card, onCardUpdate }: CashBackManagerP
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {DEFAULT_CATEGORIES.map((category) => {
-              const rate = categoryRates[category.id] || 1;
+              const categoryReward = categoryRates[category.id] || { type: 'cashback', rate: 1 };
               return (
                 <div key={category.id} className="flex items-center justify-between text-sm p-2 bg-muted/30 rounded">
                   <span>{category.name}</span>
-                  <Badge variant="secondary">{rate}%</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">
+                      {categoryReward.type === 'cashback' 
+                        ? `${categoryReward.rate}%` 
+                        : `${categoryReward.rate}x ${categoryReward.type}`}
+                    </Badge>
+                    {categoryReward.ratio && (
+                      <span className="text-xs text-muted-foreground">({categoryReward.ratio})</span>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
+        </div>
+
+        {/* Earned Rewards History */}
+        <div>
+          <h4 className="font-medium mb-3 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Recent Rewards Earned
+          </h4>
+          {card.rewardHistory && card.rewardHistory.length > 0 ? (
+            <div className="space-y-2">
+              {card.rewardHistory.slice(-5).reverse().map((reward) => (
+                <div key={reward.id} className="flex items-center justify-between p-3 bg-muted/30 rounded">
+                  <div>
+                    <p className="font-medium">{formatRewardDisplay(reward.rewardEarned)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {reward.date} • {reward.description}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      ${reward.amount.toFixed(2)} in {reward.category}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No rewards earned yet</p>
+          )}
         </div>
 
         {/* Redemption History */}

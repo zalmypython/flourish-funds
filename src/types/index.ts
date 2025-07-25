@@ -120,6 +120,9 @@ export interface CreditCardBonus {
   notes?: string;
   rewardType: 'cashback' | 'points' | 'miles';
   actualRewardAmount?: number;
+  // Enhanced bonus tracking
+  spendingByCategory?: { [category: string]: number };
+  autoTracking: boolean; // Whether to automatically track progress
 }
 
 export interface CreditCardGoal {
@@ -176,11 +179,22 @@ export interface CreditCard extends FirebaseDocument {
   // Cached balance for performance
   currentBalance: number;
   lastBalanceUpdate: string;
-  // Rewards and cash back tracking
+  // Enhanced rewards and cash back tracking
   cashBackBalance: number;
-  categoryRewards: { [category: string]: number };
+  categoryRewards: { [category: string]: { type: 'cashback' | 'points' | 'miles'; rate: number; ratio?: string } };
   rewardType: 'cashback' | 'points' | 'miles';
   redemptionHistory: RewardRedemption[];
+  // Reward earning history
+  rewardHistory: {
+    id: string;
+    date: string;
+    transactionId: string;
+    category: string;
+    amount: number;
+    rewardType: 'cashback' | 'points' | 'miles';
+    rewardEarned: number;
+    description?: string;
+  }[];
 }
 
 export const DEFAULT_CATEGORIES: TransactionCategory[] = [

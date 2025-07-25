@@ -71,7 +71,10 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
     // Rewards
     rewardType: editCard?.rewardType || 'cashback',
     cashBackBalance: editCard?.cashBackBalance?.toString() || '0',
-    categoryRewards: editCard?.categoryRewards || {}
+    categoryRewards: editCard?.categoryRewards || DEFAULT_CATEGORIES.reduce((acc, cat) => ({
+      ...acc,
+      [cat.id]: { type: 'cashback', rate: 1, ratio: undefined }
+    }), {})
   });
 
   const resetForm = () => {
@@ -96,7 +99,10 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
       churningNotes: '',
       rewardType: 'cashback',
       cashBackBalance: '0',
-      categoryRewards: {}
+      categoryRewards: DEFAULT_CATEGORIES.reduce((acc, cat) => ({
+        ...acc,
+        [cat.id]: { type: 'cashback', rate: 1, ratio: undefined }
+      }), {})
     });
     setCurrentTab('basic');
   };
@@ -151,6 +157,7 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
       cashBackBalance: parseFloat(formData.cashBackBalance) || 0,
       categoryRewards: formData.categoryRewards,
       redemptionHistory: editCard?.redemptionHistory || [],
+      rewardHistory: editCard?.rewardHistory || [],
       
       // Initialize with empty arrays if not editing
       bonuses: editCard?.bonuses || [],
@@ -346,32 +353,82 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
             </div>
             
             <div>
-              <Label className="text-base font-medium">Category Reward Rates (%)</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                {DEFAULT_CATEGORIES.map((category) => (
-                  <div key={category.id} className="flex items-center justify-between">
-                    <Label htmlFor={`rate_${category.id}`} className="text-sm">{category.name}</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id={`rate_${category.id}`}
-                        type="number"
-                        step="0.25"
-                        min="0"
-                        max="10"
-                        className="w-20"
-                        value={formData.categoryRewards[category.id] || 1}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          categoryRewards: {
-                            ...prev.categoryRewards,
-                            [category.id]: parseFloat(e.target.value) || 1
-                          }
-                        }))}
-                      />
-                      <span className="text-sm text-muted-foreground">%</span>
+              <Label className="text-base font-medium">Category Reward Configuration</Label>
+              <div className="space-y-4 mt-4">
+                {DEFAULT_CATEGORIES.map((category) => {
+                  const categoryReward = formData.categoryRewards[category.id] || { type: 'cashback', rate: 1 };
+                  return (
+                    <div key={category.id} className="p-4 border rounded-lg space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="font-medium">{category.name}</Label>
+                        <Select 
+                          value={categoryReward.type} 
+                          onValueChange={(value: 'cashback' | 'points' | 'miles') => setFormData(prev => ({
+                            ...prev,
+                            categoryRewards: {
+                              ...prev.categoryRewards,
+                              [category.id]: { ...categoryReward, type: value }
+                            }
+                          }))}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cashback">Cash Back</SelectItem>
+                            <SelectItem value="points">Points</SelectItem>
+                            <SelectItem value="miles">Miles</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-sm">
+                            {categoryReward.type === 'cashback' ? 'Percentage (%)' : 'Multiplier (x)'}
+                          </Label>
+                          <Input
+                            type="number"
+                            step={categoryReward.type === 'cashback' ? '0.25' : '0.5'}
+                            min="0"
+                            max={categoryReward.type === 'cashback' ? '10' : '20'}
+                            value={categoryReward.rate}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              categoryRewards: {
+                                ...prev.categoryRewards,
+                                [category.id]: { 
+                                  ...categoryReward, 
+                                  rate: parseFloat(e.target.value) || 1 
+                                }
+                              }
+                            }))}
+                          />
+                        </div>
+                        
+                        {(categoryReward.type === 'points' || categoryReward.type === 'miles') && (
+                          <div>
+                            <Label className="text-sm">Ratio (optional)</Label>
+                            <Input
+                              placeholder="e.g., $1 = 2 points"
+                              value={categoryReward.ratio || ''}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                categoryRewards: {
+                                  ...prev.categoryRewards,
+                                  [category.id]: { 
+                                    ...categoryReward, 
+                                    ratio: e.target.value || undefined 
+                                  }
+                                }
+                              }))}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </TabsContent>

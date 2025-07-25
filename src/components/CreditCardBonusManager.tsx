@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/hooks/useFirestore';
 import { CreditCard, CreditCardBonus } from '@/types';
@@ -35,7 +36,9 @@ export const CreditCardBonusManager = ({ cardId, bonuses, onBonusUpdate }: Credi
     endDate: '',
     category: '',
     categoryMultiplier: '',
-    notes: ''
+    notes: '',
+    rewardType: 'cashback',
+    autoTracking: true
   });
 
   const resetForm = () => {
@@ -49,7 +52,9 @@ export const CreditCardBonusManager = ({ cardId, bonuses, onBonusUpdate }: Credi
       endDate: '',
       category: '',
       categoryMultiplier: '',
-      notes: ''
+      notes: '',
+      rewardType: 'cashback',
+      autoTracking: true
     });
   };
 
@@ -78,7 +83,9 @@ export const CreditCardBonusManager = ({ cardId, bonuses, onBonusUpdate }: Credi
       category: formData.category || undefined,
       categoryMultiplier: formData.categoryMultiplier ? parseFloat(formData.categoryMultiplier) : undefined,
       notes: formData.notes || undefined,
-      rewardType: 'cashback'
+      rewardType: formData.rewardType as 'cashback' | 'points' | 'miles',
+      spendingByCategory: {},
+      autoTracking: formData.autoTracking
     };
 
     try {
@@ -232,6 +239,22 @@ export const CreditCardBonusManager = ({ cardId, bonuses, onBonusUpdate }: Credi
                   />
                 </div>
                 <div>
+                  <Label htmlFor="rewardType">Reward Type</Label>
+                  <Select value={formData.rewardType} onValueChange={(value: 'cashback' | 'points' | 'miles') => setFormData(prev => ({ ...prev, rewardType: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select reward type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cashback">Cash Back</SelectItem>
+                      <SelectItem value="points">Points</SelectItem>
+                      <SelectItem value="miles">Miles</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <Label htmlFor="category">Bonus Category</Label>
                   <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
                     <SelectTrigger>
@@ -246,6 +269,14 @@ export const CreditCardBonusManager = ({ cardId, bonuses, onBonusUpdate }: Credi
                       <SelectItem value="online">Online purchases</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="flex items-center space-x-2 pt-6">
+                  <Switch 
+                    id="autoTracking" 
+                    checked={formData.autoTracking}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, autoTracking: checked }))}
+                  />
+                  <Label htmlFor="autoTracking" className="text-sm">Auto-track spending</Label>
                 </div>
               </div>
 

@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useFirestore, FirebaseDocument } from '@/hooks/useFirestore';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
+import { useRewardCalculation } from '@/hooks/useRewardCalculation';
 import { useToast } from '@/hooks/use-toast';
 import { Transaction, DEFAULT_CATEGORIES, BankAccount, CreditCard } from '@/types';
 import { AuthModal } from '@/components/AuthModal';
 import { TransferModal } from '@/components/TransferModal';
 import { QuickTransactionEntry } from '@/components/QuickTransactionEntry';
 import { EnhancedTransactionList } from '@/components/EnhancedTransactionList';
+import OptimalCardSuggestion from '@/components/OptimalCardSuggestion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +42,7 @@ export const Transactions = () => {
   const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
   const { documents: budgets } = useFirestore<Budget>('budgets');
   const { addTransactionWithBalanceUpdate } = useAccountBalance();
+  const { processTransactionRewards } = useRewardCalculation();
   const { toast } = useToast();
   
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -112,7 +115,7 @@ export const Transactions = () => {
         ? budgets.find(b => b.id === formData.budgetId)?.category || 'other'
         : formData.type === 'income' ? 'income' : 'other';
 
-      await addTransactionWithBalanceUpdate({
+      const newTransactionData = {
         date: formData.date,
         amount: parseFloat(formData.amount),
         description: formData.description,
@@ -122,7 +125,25 @@ export const Transactions = () => {
         type: formData.type,
         notes: formData.notes,
         status: formData.status
-      });
+      };
+
+      const newTransaction = await addTransactionWithBalanceUpdate(newTransactionData);
+
+      // Process rewards if this is a credit card transaction
+      if (formData.accountType === 'credit' && formData.type === 'expense') {
+        const creditCard = creditCards.find(card => card.id === formData.accountId);
+        if (creditCard) {
+          // Create transaction object with generated ID for reward calculation
+          const transactionForRewards = { 
+            ...newTransactionData, 
+            id: `temp_${Date.now()}`,
+            userId: user?.uid || '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          } as Transaction;
+          await processTransactionRewards(transactionForRewards, creditCard);
+        }
+      }
 
       setFormData({
         date: new Date().toISOString().split('T')[0],
@@ -361,6 +382,16 @@ export const Transactions = () => {
                     </Select>
                   </div>
                 </div>
+
+                {/* Optimal Card Suggestion */}
+                {formData.accountType === 'credit' && formData.amount && parseFloat(formData.amount) > 0 && formData.type === 'expense' && formData.budgetId && (
+                  <OptimalCardSuggestion
+                    amount={parseFloat(formData.amount)}
+                    category={budgets.find(b => b.id === formData.budgetId)?.category || 'other'}
+                    cards={creditCards}
+                    onCardSelect={(cardId) => setFormData({ ...formData, accountId: cardId })}
+                  />
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes (Optional)</Label>
