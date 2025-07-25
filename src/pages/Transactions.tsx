@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useFirestore } from '@/hooks/useFirestore';
+import { useFirestore, FirebaseDocument } from '@/hooks/useFirestore';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { Transaction, DEFAULT_CATEGORIES, BankAccount, CreditCard } from '@/types';
 import { AuthModal } from '@/components/AuthModal';
@@ -19,12 +19,25 @@ import { Separator } from '@/components/ui/separator';
 import { Plus, Search, Filter, Calendar, DollarSign, ArrowUpDown, Eye, EyeOff, ArrowRightLeft, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 
+interface Budget extends FirebaseDocument {
+  name: string;
+  category: string;
+  amount: number;
+  spent: number;
+  period: 'weekly' | 'monthly' | 'yearly';
+  startDate: string;
+  endDate: string;
+  alertThreshold: number;
+  status: 'active' | 'exceeded' | 'completed';
+}
+
 
 export const Transactions = () => {
   const { user } = useAuth();
   const { documents: transactions, loading, deleteDocument } = useFirestore<Transaction>('transactions');
   const { documents: bankAccounts } = useFirestore<BankAccount>('bankAccounts');
   const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
+  const { documents: budgets } = useFirestore<Budget>('budgets');
   const { addTransactionWithBalanceUpdate } = useAccountBalance();
   
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -39,13 +52,16 @@ export const Transactions = () => {
     date: new Date().toISOString().split('T')[0],
     amount: '',
     description: '',
-    category: '',
+    budgetId: '',
     accountId: '',
     accountType: 'bank' as 'bank' | 'credit',
     type: 'expense' as 'income' | 'expense' | 'transfer' | 'payment',
     notes: '',
     status: 'cleared' as 'pending' | 'cleared' | 'reconciled'
   });
+
+  // Get active budgets for expenses
+  const activeBudgets = budgets.filter(budget => budget.status === 'active');
 
   if (!user) {
     return <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />;
@@ -66,12 +82,23 @@ export const Transactions = () => {
 
   const handleAddTransaction = async () => {
     if (!formData.amount || !formData.description || !formData.accountId) return;
+    
+    // For expenses, check if budget is selected
+    if (formData.type === 'expense' && !formData.budgetId) {
+      // Could add toast notification here for missing budget
+      return;
+    }
+
+    // For expenses, use budget's category. For income, use 'income' category
+    const category = formData.type === 'expense' && formData.budgetId
+      ? budgets.find(b => b.id === formData.budgetId)?.category || 'other'
+      : 'income';
 
     await addTransactionWithBalanceUpdate({
       date: formData.date,
       amount: parseFloat(formData.amount),
       description: formData.description,
-      category: formData.category || 'other',
+      category,
       accountId: formData.accountId,
       accountType: formData.accountType,
       type: formData.type,
@@ -83,7 +110,7 @@ export const Transactions = () => {
       date: new Date().toISOString().split('T')[0],
       amount: '',
       description: '',
-      category: '',
+      budgetId: '',
       accountId: '',
       accountType: 'bank',
       type: 'expense',
@@ -222,19 +249,25 @@ export const Transactions = () => {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DEFAULT_CATEGORIES.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Budget/Category</Label>
+                    {formData.type === 'expense' ? (
+                      <Select value={formData.budgetId} onValueChange={(value) => setFormData({ ...formData, budgetId: value })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Budget" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-background border">
+                          {activeBudgets.map((budget) => (
+                            <SelectItem key={budget.id} value={budget.id}>
+                              {budget.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="flex items-center justify-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
+                        No budget needed for income
+                      </div>
+                    )}
                   </div>
                 </div>
 
