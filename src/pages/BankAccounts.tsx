@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useFirestore, FirebaseDocument } from "@/hooks/useFirestore";
 import { useAuth } from "@/hooks/useAuth";
 import { AuthModal } from "@/components/AuthModal";
+import { useAccountBalance } from "@/hooks/useAccountBalance";
 import { 
   Plus, 
   Wallet, 
@@ -25,7 +26,7 @@ import {
 interface BankAccount extends FirebaseDocument {
   name: string;
   type: string;
-  balance: number;
+  initialBalance: number;
   accountNumber: string;
   isActive: boolean;
   createdDate: string;
@@ -35,6 +36,7 @@ interface BankAccount extends FirebaseDocument {
 const BankAccounts = () => {
   const { user } = useAuth();
   const { documents: accounts, loading, addDocument, updateDocument, deleteDocument } = useFirestore<BankAccount>('bankAccounts');
+  const { calculateAccountBalance, getAccountTransactionSummary } = useAccountBalance();
   const [showBalances, setShowBalances] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -53,7 +55,10 @@ const BankAccounts = () => {
 
   const activeAccounts = accounts.filter(account => account.isActive);
   const closedAccounts = accounts.filter(account => !account.isActive);
-  const totalBalance = activeAccounts.reduce((sum, account) => sum + account.balance, 0);
+  const totalBalance = activeAccounts.reduce((sum, account) => {
+    const currentBalance = calculateAccountBalance(account.id, 'bank', account.initialBalance);
+    return sum + currentBalance;
+  }, 0);
 
   const getAccountTypeColor = (type: string) => {
     switch (type) {
@@ -82,7 +87,7 @@ const BankAccounts = () => {
     await addDocument({
       name: formData.name,
       type: formData.type,
-      balance: parseFloat(formData.balance),
+      initialBalance: parseFloat(formData.balance),
       accountNumber: `****${formData.accountNumber}`,
       isActive: true,
       createdDate: new Date().toISOString().split('T')[0]
@@ -220,58 +225,67 @@ const BankAccounts = () => {
       <div>
         <h2 className="text-xl font-semibold text-foreground mb-4">Active Accounts</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {activeAccounts.map((account) => (
-            <Card key={account.id} className="shadow-card border-border/50 hover:shadow-elegant transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${getAccountTypeColor(account.type)}`}>
-                      {getAccountTypeIcon(account.type)}
+          {activeAccounts.map((account) => {
+            const currentBalance = calculateAccountBalance(account.id, 'bank', account.initialBalance);
+            const summary = getAccountTransactionSummary(account.id, 'bank');
+            return (
+              <Card key={account.id} className="shadow-card border-border/50 hover:shadow-elegant transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${getAccountTypeColor(account.type)}`}>
+                        {getAccountTypeIcon(account.type)}
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">{account.name}</CardTitle>
+                        <CardDescription className="capitalize">{account.type}</CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleToggleAccountStatus(account.id)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteAccount(account.id)} className="text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Current Balance</p>
+                      <p className="text-2xl font-bold text-foreground">
+                        {showBalances ? `$${currentBalance.toLocaleString()}` : "••••••"}
+                      </p>
+                      {summary.transactionCount > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {summary.transactionCount} transactions • Initial: ${account.initialBalance.toLocaleString()}
+                        </p>
+                      )}
                     </div>
                     <div>
-                      <CardTitle className="text-base">{account.name}</CardTitle>
-                      <CardDescription className="capitalize">{account.type}</CardDescription>
+                      <p className="text-sm text-muted-foreground">Account Number</p>
+                      <p className="text-sm font-mono">{account.accountNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Opened</p>
+                      <p className="text-sm">{new Date(account.createdDate).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button variant="outline" size="sm" className="flex-1">
+                        <Edit className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                      <Button variant="outline" size="sm" className="flex-1">
+                        View Transactions
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => handleToggleAccountStatus(account.id)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleDeleteAccount(account.id)} className="text-destructive hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Balance</p>
-                    <p className="text-2xl font-bold text-foreground">
-                      {showBalances ? `$${account.balance.toLocaleString()}` : "••••••"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Account Number</p>
-                    <p className="text-sm font-mono">{account.accountNumber}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Opened</p>
-                    <p className="text-sm">{new Date(account.createdDate).toLocaleDateString()}</p>
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" className="flex-1">
-                      <Edit className="h-3 w-3 mr-1" />
-                      Edit
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex-1">
-                      View Transactions
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
 

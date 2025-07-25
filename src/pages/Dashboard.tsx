@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useFirestore, FirebaseDocument } from "@/hooks/useFirestore";
 import { AuthModal } from "@/components/AuthModal";
+import { useAccountBalance } from "@/hooks/useAccountBalance";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -24,14 +25,14 @@ import { Link } from "react-router-dom";
 interface BankAccount extends FirebaseDocument {
   name: string;
   type: string;
-  balance: number;
+  initialBalance: number;
   isActive: boolean;
 }
 
 interface CreditCard extends FirebaseDocument {
   name: string;
-  balance: number;
-  creditLimit: number;
+  initialBalance: number;
+  limit: number;
   isActive: boolean;
 }
 
@@ -56,6 +57,7 @@ const Dashboard = () => {
   const { documents: budgetCategories } = useFirestore<BudgetCategory>('budgetCategories');
   const { documents: savingsGoals } = useFirestore<SavingsGoal>('savingsGoals');
   const { documents: transactions } = useFirestore<any>('transactions');
+  const { calculateAccountBalance } = useAccountBalance();
   
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showBalances, setShowBalances] = useState(true);
@@ -64,26 +66,19 @@ const Dashboard = () => {
     return <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />;
   }
 
-  // Calculate real balances from transactions
+  // Calculate real balances using the hook
   const activeAccounts = bankAccounts.filter(acc => acc.isActive);
-  const accountBalances = activeAccounts.map(account => {
-    const accountTransactions = transactions.filter(t => t.accountId === account.id && t.accountType === 'bank');
-    const transactionTotal = accountTransactions.reduce((sum, t) => {
-      return sum + (t.type === 'income' ? t.amount : -t.amount);
-    }, 0);
-    return account.balance + transactionTotal;
-  });
-  const totalBankBalance = accountBalances.reduce((sum, balance) => sum + balance, 0);
+  const totalBankBalance = activeAccounts.reduce((sum, account) => {
+    return sum + calculateAccountBalance(account.id, 'bank', account.initialBalance);
+  }, 0);
   
   const activeCards = creditCards.filter(card => card.isActive);
-  const cardBalances = activeCards.map(card => {
-    const cardTransactions = transactions.filter(t => t.accountId === card.id && t.accountType === 'credit');
-    const transactionTotal = cardTransactions.reduce((sum, t) => sum + t.amount, 0);
-    return card.balance + transactionTotal;
-  });
-  const totalCreditUsed = cardBalances.reduce((sum, balance) => sum + balance, 0);
-  const totalCreditLimit = activeCards.reduce((sum, card) => sum + card.creditLimit, 0);
-  const creditUtilization = totalCreditLimit > 0 ? (totalCreditUsed / totalCreditLimit) * 100 : 0;
+  const totalCreditBalance = activeCards.reduce((sum, card) => {
+    return sum + calculateAccountBalance(card.id, 'credit', card.initialBalance);
+  }, 0);
+  
+  const totalCreditLimit = activeCards.reduce((sum, card) => sum + card.limit, 0);
+  const creditUtilization = totalCreditLimit > 0 ? (totalCreditBalance / totalCreditLimit) * 100 : 0;
 
   const totalBudgeted = budgetCategories.reduce((sum, cat) => sum + cat.budgeted, 0);
   const totalSpent = budgetCategories.reduce((sum, cat) => sum + cat.spent, 0);
@@ -94,7 +89,7 @@ const Dashboard = () => {
   const goalsProgress = totalGoalsTarget > 0 ? (totalGoalsSaved / totalGoalsTarget) * 100 : 0;
 
   // Net worth calculation
-  const netWorth = totalBankBalance - totalCreditUsed;
+  const netWorth = totalBankBalance - totalCreditBalance;
 
   // Mock data for trends
   const netWorthTrend = [
@@ -199,7 +194,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-foreground">
-              {showBalances ? `$${totalCreditUsed.toLocaleString()}` : "••••••"}
+              {showBalances ? `$${totalCreditBalance.toLocaleString()}` : "••••••"}
             </p>
             <p className={`text-sm mt-1 ${creditUtilization > 30 ? 'text-warning' : 'text-success'}`}>
               {creditUtilization.toFixed(1)}% utilization

@@ -8,7 +8,7 @@ export interface Transaction extends FirebaseDocument {
   subcategory?: string;
   accountId: string;
   accountType: 'bank' | 'credit';
-  type: 'income' | 'expense' | 'transfer';
+  type: 'income' | 'expense' | 'transfer' | 'payment';
   tags?: string[];
   notes?: string;
   isRecurring?: boolean;

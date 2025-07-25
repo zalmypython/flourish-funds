@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useFirestore, FirebaseDocument } from "@/hooks/useFirestore";
 import { AuthModal } from "@/components/AuthModal";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccountBalance } from "@/hooks/useAccountBalance";
 import { 
   Plus, 
   CreditCard, 
@@ -30,7 +31,7 @@ interface CreditCardData extends FirebaseDocument {
   issuer: string;
   type: string;
   limit: number;
-  balance: number;
+  initialBalance: number;
   dueDate: string;
   interestRate: number;
   isActive: boolean;
@@ -45,6 +46,7 @@ interface CreditCardData extends FirebaseDocument {
 const CreditCards = () => {
   const { user } = useAuth();
   const { documents: cards, loading, addDocument, updateDocument, deleteDocument } = useFirestore<CreditCardData>("creditCards");
+  const { calculateAccountBalance, getAccountTransactionSummary } = useAccountBalance();
   const [showBalances, setShowBalances] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -76,7 +78,10 @@ const CreditCards = () => {
 
   const activeCards = cards.filter(card => card.isActive);
   const inactiveCards = cards.filter(card => !card.isActive);
-  const totalBalance = activeCards.reduce((sum, card) => sum + card.balance, 0);
+  const totalBalance = activeCards.reduce((sum, card) => {
+    const currentBalance = calculateAccountBalance(card.id, 'credit', card.initialBalance);
+    return sum + currentBalance;
+  }, 0);
   const totalLimit = activeCards.reduce((sum, card) => sum + card.limit, 0);
   const utilization = totalLimit > 0 ? (totalBalance / totalLimit) * 100 : 0;
 
@@ -119,7 +124,7 @@ const CreditCards = () => {
       issuer: formData.issuer,
       type: formData.type,
       limit: parseFloat(formData.limit),
-      balance: 0,
+      initialBalance: 0,
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       interestRate: parseFloat(formData.interestRate),
       isActive: true,
@@ -303,7 +308,8 @@ const CreditCards = () => {
         <h2 className="text-xl font-semibold text-foreground mb-4">Active Cards</h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {activeCards.map((card) => {
-            const cardUtilization = (card.balance / card.limit) * 100;
+            const currentBalance = calculateAccountBalance(card.id, 'credit', card.initialBalance);
+            const cardUtilization = (currentBalance / card.limit) * 100;
             return (
               <Card key={card.id} className="shadow-card border-border/50 hover:shadow-elegant transition-shadow">
                 <CardHeader>
@@ -332,7 +338,7 @@ const CreditCards = () => {
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-sm text-muted-foreground">Balance</span>
                       <span className="text-sm text-muted-foreground">
-                        {showBalances ? `$${card.balance.toLocaleString()} / $${card.limit.toLocaleString()}` : "•••••• / ••••••"}
+                        {showBalances ? `$${currentBalance.toLocaleString()} / $${card.limit.toLocaleString()}` : "•••••• / ••••••"}
                       </span>
                     </div>
                     <Progress value={cardUtilization} className="h-2" />

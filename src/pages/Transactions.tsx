@@ -51,7 +51,7 @@ export const Transactions = () => {
     category: '',
     accountId: '',
     accountType: 'bank' as 'bank' | 'credit',
-    type: 'expense' as 'income' | 'expense' | 'transfer',
+    type: 'expense' as 'income' | 'expense' | 'transfer' | 'payment',
     notes: '',
     status: 'cleared' as 'pending' | 'cleared' | 'reconciled'
   });
@@ -219,6 +219,7 @@ export const Transactions = () => {
                         <SelectItem value="income">Income</SelectItem>
                         <SelectItem value="expense">Expense</SelectItem>
                         <SelectItem value="transfer">Transfer</SelectItem>
+                        <SelectItem value="payment">Credit Card Payment</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
