@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useFirestore, FirebaseDocument } from "@/hooks/useFirestore";
+import { AuthModal } from "@/components/AuthModal";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   Plus, 
   CreditCard, 
@@ -18,11 +21,11 @@ import {
   Eye,
   EyeOff,
   Edit,
-  Trash2
+  Trash2,
+  LogIn
 } from "lucide-react";
 
-interface CreditCardData {
-  id: string;
+interface CreditCardData extends FirebaseDocument {
   name: string;
   issuer: string;
   type: string;
@@ -40,61 +43,11 @@ interface CreditCardData {
 }
 
 const CreditCards = () => {
-  const [cards, setCards] = useState<CreditCardData[]>([
-    {
-      id: "1",
-      name: "Chase Sapphire Preferred",
-      issuer: "Chase",
-      type: "Travel",
-      limit: 15000,
-      balance: 2400,
-      dueDate: "2024-02-15",
-      interestRate: 19.99,
-      isActive: true,
-      bonuses: [
-        {
-          id: "b1",
-          description: "60k points welcome bonus",
-          status: "Completed",
-          requirement: "Spend $4,000 in 3 months"
-        }
-      ]
-    },
-    {
-      id: "2",
-      name: "Citi Double Cash",
-      issuer: "Citi",
-      type: "Cashback",
-      limit: 8000,
-      balance: 1250,
-      dueDate: "2024-02-20",
-      interestRate: 18.24,
-      isActive: true,
-      bonuses: [
-        {
-          id: "b2",
-          description: "$200 cash back",
-          status: "In Progress",
-          requirement: "Spend $1,500 in 6 months"
-        }
-      ]
-    },
-    {
-      id: "3",
-      name: "Discover It",
-      issuer: "Discover",
-      type: "Cashback",
-      limit: 5000,
-      balance: 0,
-      dueDate: "2024-02-10",
-      interestRate: 16.99,
-      isActive: false,
-      bonuses: []
-    }
-  ]);
-
+  const { user } = useAuth();
+  const { documents: cards, loading, addDocument, updateDocument, deleteDocument } = useFirestore<CreditCardData>("creditCards");
   const [showBalances, setShowBalances] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     issuer: "",
@@ -104,6 +57,22 @@ const CreditCards = () => {
   });
 
   const { toast } = useToast();
+
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-foreground mb-2">Credit Cards</h1>
+          <p className="text-muted-foreground mb-6">Sign in to manage your credit cards</p>
+          <Button onClick={() => setIsAuthModalOpen(true)} className="bg-gradient-primary text-primary-foreground hover:scale-105 shadow-elegant">
+            <LogIn className="h-4 w-4 mr-2" />
+            Sign In
+          </Button>
+        </div>
+        <AuthModal open={isAuthModalOpen} onOpenChange={setIsAuthModalOpen} />
+      </div>
+    );
+  }
 
   const activeCards = cards.filter(card => card.isActive);
   const inactiveCards = cards.filter(card => !card.isActive);
@@ -135,7 +104,7 @@ const CreditCards = () => {
     }
   };
 
-  const handleAddCard = () => {
+  const handleAddCard = async () => {
     if (!formData.name || !formData.issuer || !formData.type || !formData.limit || !formData.interestRate) {
       toast({
         title: "Error",
@@ -145,52 +114,44 @@ const CreditCards = () => {
       return;
     }
 
-    const newCard: CreditCardData = {
-      id: Date.now().toString(),
+    const newCard = {
       name: formData.name,
       issuer: formData.issuer,
       type: formData.type,
       limit: parseFloat(formData.limit),
       balance: 0,
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       interestRate: parseFloat(formData.interestRate),
       isActive: true,
       bonuses: []
     };
 
-    setCards(prev => [...prev, newCard]);
+    await addDocument(newCard);
     setFormData({ name: "", issuer: "", type: "", limit: "", interestRate: "" });
     setIsAddDialogOpen(false);
-    
-    toast({
-      title: "Success",
-      description: `${formData.name} has been added to your credit cards.`
-    });
   };
 
-  const handleDeleteCard = (cardId: string) => {
+  const handleDeleteCard = async (cardId: string) => {
+    await deleteDocument(cardId);
+  };
+
+  const handleToggleCardStatus = async (cardId: string) => {
     const card = cards.find(c => c.id === cardId);
-    setCards(prev => prev.filter(c => c.id !== cardId));
-    
-    toast({
-      title: "Card Deleted",
-      description: `${card?.name} has been removed from your credit cards.`
-    });
+    if (card) {
+      await updateDocument(cardId, { isActive: !card.isActive });
+    }
   };
 
-  const handleToggleCardStatus = (cardId: string) => {
-    setCards(prev => prev.map(card => 
-      card.id === cardId 
-        ? { ...card, isActive: !card.isActive }
-        : card
-    ));
-
-    const card = cards.find(c => c.id === cardId);
-    toast({
-      title: card?.isActive ? "Card Deactivated" : "Card Activated",
-      description: `${card?.name} has been ${card?.isActive ? 'deactivated' : 'activated'}.`
-    });
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading your credit cards...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

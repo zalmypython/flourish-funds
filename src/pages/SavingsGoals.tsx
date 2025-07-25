@@ -6,6 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { useFirestore, FirebaseDocument } from "@/hooks/useFirestore";
+import { AuthModal } from "@/components/AuthModal";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   Plus, 
   Target, 
@@ -17,13 +22,16 @@ import {
   Car,
   GraduationCap,
   Heart,
-  MoreHorizontal
+  MoreHorizontal,
+  LogIn,
+  Edit,
+  Trash2
 } from "lucide-react";
+import React from "react";
 
-interface SavingsGoal {
-  id: string;
+interface SavingsGoal extends FirebaseDocument {
   name: string;
-  icon: any;
+  icon: string;
   color: string;
   targetAmount: number;
   currentAmount: number;
@@ -34,68 +42,55 @@ interface SavingsGoal {
 }
 
 const SavingsGoals = () => {
-  const [goals, setGoals] = useState<SavingsGoal[]>([
-    {
-      id: "1",
-      name: "Emergency Fund",
-      icon: Target,
-      color: "hsl(var(--destructive))",
-      targetAmount: 15000,
-      currentAmount: 8500,
-      deadline: "2024-12-31",
-      monthlyContribution: 500,
-      priority: "High",
-      status: "Active"
-    },
-    {
-      id: "2",
-      name: "Vacation to Japan",
-      icon: Plane,
-      color: "hsl(var(--primary))",
-      targetAmount: 5000,
-      currentAmount: 2800,
-      deadline: "2024-06-15",
-      monthlyContribution: 400,
-      priority: "Medium",
-      status: "Active"
-    },
-    {
-      id: "3",
-      name: "House Down Payment",
-      icon: Home,
-      color: "hsl(var(--accent))",
-      targetAmount: 50000,
-      currentAmount: 12000,
-      deadline: "2025-08-01",
-      monthlyContribution: 800,
-      priority: "High",
-      status: "Active"
-    },
-    {
-      id: "4",
-      name: "New Car",
-      icon: Car,
-      color: "hsl(var(--warning))",
-      targetAmount: 25000,
-      currentAmount: 25000,
-      deadline: "2024-01-15",
-      monthlyContribution: 0,
-      priority: "Medium",
-      status: "Completed"
-    },
-    {
-      id: "5",
-      name: "Wedding Fund",
-      icon: Heart,
-      color: "hsl(190 60% 50%)",
-      targetAmount: 20000,
-      currentAmount: 5500,
-      deadline: "2024-09-20",
-      monthlyContribution: 600,
-      priority: "High",
-      status: "Active"
-    }
-  ]);
+  const { user } = useAuth();
+  const { documents: goals, loading, addDocument, updateDocument, deleteDocument } = useFirestore<SavingsGoal>("savingsGoals");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    targetAmount: "",
+    currentAmount: "",
+    deadline: "",
+    monthlyContribution: "",
+    priority: "",
+    category: ""
+  });
+
+  const { toast } = useToast();
+
+  const iconMap: Record<string, any> = {
+    "Emergency Fund": Target,
+    "Vacation": Plane,
+    "House": Home,
+    "Car": Car,
+    "Education": GraduationCap,
+    "Wedding": Heart
+  };
+
+  const colorMap: Record<string, string> = {
+    "Emergency Fund": "hsl(var(--destructive))",
+    "Vacation": "hsl(var(--primary))",
+    "House": "hsl(var(--accent))",
+    "Car": "hsl(var(--warning))",
+    "Education": "hsl(var(--success))",
+    "Wedding": "hsl(190 60% 50%)"
+  };
+
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-foreground mb-2">Savings Goals</h1>
+          <p className="text-muted-foreground mb-6">Sign in to track your savings goals</p>
+          <Button onClick={() => setIsAuthModalOpen(true)} className="bg-gradient-primary text-primary-foreground hover:scale-105 shadow-elegant">
+            <LogIn className="h-4 w-4 mr-2" />
+            Sign In
+          </Button>
+        </div>
+        <AuthModal open={isAuthModalOpen} onOpenChange={setIsAuthModalOpen} />
+      </div>
+    );
+  }
 
   const activeGoals = goals.filter(goal => goal.status === "Active");
   const completedGoals = goals.filter(goal => goal.status === "Completed");
@@ -134,6 +129,60 @@ const SavingsGoals = () => {
     return Math.ceil((target - current) / monthly);
   };
 
+  const handleAddGoal = async () => {
+    if (!formData.name || !formData.targetAmount || !formData.deadline || !formData.priority || !formData.category) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newGoal = {
+      name: formData.name,
+      icon: formData.category,
+      color: colorMap[formData.category] || "hsl(var(--muted))",
+      targetAmount: parseFloat(formData.targetAmount),
+      currentAmount: parseFloat(formData.currentAmount) || 0,
+      deadline: formData.deadline,
+      monthlyContribution: parseFloat(formData.monthlyContribution) || 0,
+      priority: formData.priority as "High" | "Medium" | "Low",
+      status: "Active" as const
+    };
+
+    await addDocument(newGoal);
+    setFormData({ name: "", targetAmount: "", currentAmount: "", deadline: "", monthlyContribution: "", priority: "", category: "" });
+    setIsAddDialogOpen(false);
+  };
+
+  const handleDeleteGoal = async (goalId: string) => {
+    await deleteDocument(goalId);
+  };
+
+  const handleAddMoney = async (goalId: string, amount: number) => {
+    const goal = goals.find(g => g.id === goalId);
+    if (goal) {
+      const newAmount = goal.currentAmount + amount;
+      const status = newAmount >= goal.targetAmount ? "Completed" : "Active";
+      await updateDocument(goalId, { 
+        currentAmount: newAmount,
+        status
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading your savings goals...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -143,7 +192,7 @@ const SavingsGoals = () => {
           <p className="text-muted-foreground mt-1">Track progress toward your financial goals</p>
         </div>
         <div className="flex items-center gap-4">
-          <Dialog>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-primary text-primary-foreground hover:scale-105 shadow-elegant">
                 <Plus className="h-4 w-4 mr-2" />
@@ -160,29 +209,88 @@ const SavingsGoals = () => {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="goalName">Goal Name</Label>
-                  <Input id="goalName" placeholder="e.g. Emergency Fund" />
+                  <Input 
+                    id="goalName" 
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Emergency Fund" 
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="targetAmount">Target Amount</Label>
-                    <Input id="targetAmount" type="number" placeholder="10000" />
+                    <Input 
+                      id="targetAmount" 
+                      type="number" 
+                      value={formData.targetAmount}
+                      onChange={(e) => setFormData(prev => ({ ...prev, targetAmount: e.target.value }))}
+                      placeholder="10000" 
+                    />
                   </div>
                   <div>
                     <Label htmlFor="deadline">Deadline</Label>
-                    <Input id="deadline" type="date" />
+                    <Input 
+                      id="deadline" 
+                      type="date" 
+                      value={formData.deadline}
+                      onChange={(e) => setFormData(prev => ({ ...prev, deadline: e.target.value }))}
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="currentAmount">Current Amount</Label>
-                    <Input id="currentAmount" type="number" placeholder="0" />
+                    <Input 
+                      id="currentAmount" 
+                      type="number" 
+                      value={formData.currentAmount}
+                      onChange={(e) => setFormData(prev => ({ ...prev, currentAmount: e.target.value }))}
+                      placeholder="0" 
+                    />
                   </div>
                   <div>
                     <Label htmlFor="monthlyContribution">Monthly Contribution</Label>
-                    <Input id="monthlyContribution" type="number" placeholder="500" />
+                    <Input 
+                      id="monthlyContribution" 
+                      type="number" 
+                      value={formData.monthlyContribution}
+                      onChange={(e) => setFormData(prev => ({ ...prev, monthlyContribution: e.target.value }))}
+                      placeholder="500" 
+                    />
                   </div>
                 </div>
-                <Button className="w-full">Create Goal</Button>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="priority">Priority</Label>
+                    <Select value={formData.priority} onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="High">High</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="Low">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="category">Category</Label>
+                    <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Emergency Fund">Emergency Fund</SelectItem>
+                        <SelectItem value="Vacation">Vacation</SelectItem>
+                        <SelectItem value="House">House</SelectItem>
+                        <SelectItem value="Car">Car</SelectItem>
+                        <SelectItem value="Education">Education</SelectItem>
+                        <SelectItem value="Wedding">Wedding</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button onClick={handleAddGoal} className="w-full">Create Goal</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -208,7 +316,7 @@ const SavingsGoals = () => {
           <CardContent>
             <p className="text-2xl font-bold text-success">${totalCurrentAmount.toLocaleString()}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              {((totalCurrentAmount / totalTargetAmount) * 100).toFixed(1)}% of goals
+              {totalTargetAmount > 0 ? ((totalCurrentAmount / totalTargetAmount) * 100).toFixed(1) : 0}% of goals
             </p>
           </CardContent>
         </Card>
@@ -253,7 +361,7 @@ const SavingsGoals = () => {
                         className="p-2 rounded-lg text-white"
                         style={{ backgroundColor: goal.color }}
                       >
-                        <goal.icon className="h-4 w-4" />
+                        {iconMap[goal.icon] ? React.createElement(iconMap[goal.icon], { className: "h-4 w-4" }) : <Target className="h-4 w-4" />}
                       </div>
                       <div>
                         <CardTitle className="text-base">{goal.name}</CardTitle>
@@ -267,9 +375,11 @@ const SavingsGoals = () => {
                         </div>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteGoal(goal.id)} className="text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -315,11 +425,11 @@ const SavingsGoals = () => {
                   </div>
 
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1">
-                      Add Money
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleAddMoney(goal.id, 100)}>
+                      Add $100
                     </Button>
-                    <Button variant="outline" size="sm" className="flex-1">
-                      Edit Goal
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleAddMoney(goal.id, 500)}>
+                      Add $500
                     </Button>
                   </div>
                 </CardContent>
@@ -343,7 +453,7 @@ const SavingsGoals = () => {
                         className="p-2 rounded-lg text-white opacity-80"
                         style={{ backgroundColor: goal.color }}
                       >
-                        <goal.icon className="h-4 w-4" />
+                        {iconMap[goal.icon] ? React.createElement(iconMap[goal.icon], { className: "h-4 w-4" }) : <Target className="h-4 w-4" />}
                       </div>
                       <div>
                         <h3 className="font-medium text-foreground">{goal.name}</h3>
