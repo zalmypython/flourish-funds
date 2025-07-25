@@ -22,7 +22,7 @@ interface CreditCardBonusManagerProps {
 }
 
 export const CreditCardBonusManager = ({ cardId, bonuses, onBonusUpdate }: CreditCardBonusManagerProps) => {
-  const { updateDocument } = useFirestore<CreditCard>('creditCards');
+  const { updateDocument, documents: cards } = useFirestore<CreditCard>('creditCards');
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingBonus, setEditingBonus] = useState<CreditCardBonus | null>(null);
@@ -109,6 +109,9 @@ export const CreditCardBonusManager = ({ cardId, bonuses, onBonusUpdate }: Credi
 
   const handleUpdateBonusStatus = async (bonusId: string, newStatus: CreditCardBonus['status'], additionalData?: Partial<CreditCardBonus>) => {
     try {
+      const bonus = bonuses.find(b => b.id === bonusId);
+      if (!bonus) return;
+
       const updatedBonuses = bonuses.map(bonus => 
         bonus.id === bonusId 
           ? { 
@@ -121,7 +124,26 @@ export const CreditCardBonusManager = ({ cardId, bonuses, onBonusUpdate }: Credi
           : bonus
       );
       
-      await updateDocument(cardId, { bonuses: updatedBonuses });
+      // If marking as paid out, automatically add bonus to reward balance
+      let cardUpdates: Partial<CreditCard> = { bonuses: updatedBonuses };
+      
+      if (newStatus === 'paid_out') {
+        const bonusAmount = parseBonusAmount(bonus.bonusAmount, bonus.rewardType);
+        if (bonusAmount > 0) {
+          // Get current card data to update balance
+          const currentCard = cards.find(c => c.id === cardId);
+          const currentBalance = currentCard?.cashBackBalance || 0;
+          
+          cardUpdates.cashBackBalance = currentBalance + bonusAmount;
+          
+          toast({
+            title: "Bonus Added to Balance! 🎉",
+            description: `${formatBonusAmount(bonusAmount, bonus.rewardType)} added to your reward balance`,
+          });
+        }
+      }
+      
+      await updateDocument(cardId, cardUpdates);
       toast({
         title: "Success",
         description: "Bonus status updated successfully!"
@@ -133,6 +155,31 @@ export const CreditCardBonusManager = ({ cardId, bonuses, onBonusUpdate }: Credi
         description: error.message,
         variant: "destructive"
       });
+    }
+  };
+
+  const parseBonusAmount = (bonusAmountString: string, rewardType: 'cashback' | 'points' | 'miles'): number => {
+    if (!bonusAmountString) return 0;
+    
+    // Extract numbers from string like "$500 cash back" or "80,000 points"
+    const numbers = bonusAmountString.match(/[\d,]+\.?\d*/g);
+    if (!numbers || numbers.length === 0) return 0;
+    
+    // Remove commas and parse the first number found
+    const amount = parseFloat(numbers[0].replace(/,/g, ''));
+    return isNaN(amount) ? 0 : amount;
+  };
+
+  const formatBonusAmount = (amount: number, rewardType: 'cashback' | 'points' | 'miles'): string => {
+    switch (rewardType) {
+      case 'cashback':
+        return `$${amount.toFixed(2)}`;
+      case 'points':
+        return `${amount.toLocaleString()} points`;
+      case 'miles':
+        return `${amount.toLocaleString()} miles`;
+      default:
+        return amount.toString();
     }
   };
 
