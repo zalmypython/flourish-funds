@@ -279,13 +279,13 @@ export const Transactions = () => {
                   <div className="space-y-2">
                     <Label>Budget/Category</Label>
                     {formData.type === 'expense' ? (
-                      <Select value={formData.budgetId} onValueChange={(value) => setFormData({ ...formData, budgetId: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Budget" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background border z-50">
-                          {activeBudgets.length > 0 ? (
-                            activeBudgets.map((budget) => (
+                      activeBudgets.length > 0 ? (
+                        <Select value={formData.budgetId} onValueChange={(value) => setFormData({ ...formData, budgetId: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Budget" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border z-50">
+                            {activeBudgets.map((budget) => (
                               <SelectItem key={budget.id} value={budget.id}>
                                 <div className="flex items-center justify-between w-full">
                                   <span>{budget.name}</span>
@@ -294,14 +294,14 @@ export const Transactions = () => {
                                   </Badge>
                                 </div>
                               </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="" disabled>
-                              No active budgets available
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="flex items-center justify-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
+                          No active budgets available
+                        </div>
+                      )
                     ) : (
                       <div className="flex items-center justify-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
                         No budget needed for {formData.type}
