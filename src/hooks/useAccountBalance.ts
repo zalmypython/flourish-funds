@@ -4,10 +4,13 @@ import { Transaction, BankAccount, CreditCard } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 export const useAccountBalance = () => {
-  const { documents: transactions } = useFirestore<Transaction>('transactions');
-  const { documents: bankAccounts } = useFirestore<BankAccount>('bankAccounts');
-  const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
-  const { addDocument: addTransaction } = useFirestore<Transaction>('transactions');
+  const transactionHook = useFirestore<Transaction>('transactions');
+  const bankAccountsHook = useFirestore<BankAccount>('bankAccounts');
+  const creditCardsHook = useFirestore<CreditCard>('creditCards');
+  
+  const { documents: transactions, addDocument: addTransaction } = transactionHook;
+  const { documents: bankAccounts } = bankAccountsHook;
+  const { documents: creditCards } = creditCardsHook;
   const { toast } = useToast();
   
   const calculateAccountBalance = useMemo(() => {

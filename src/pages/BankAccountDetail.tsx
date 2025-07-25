@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useAuth } from '@/hooks/useAuth';
+import { SmartBudgetIntegration } from '@/components/SmartBudgetIntegration';
 import { BankAccount, Transaction, AccountGoal, AccountBonus } from '@/types';
 import { ArrowLeft, Wallet, TrendingUp, TrendingDown, Calendar, Target, Gift, Plus, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -224,6 +225,9 @@ const BankAccountDetail = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Smart Budget Integration */}
+      <SmartBudgetIntegration accountId={account.id} accountType="bank" />
 
       {/* Recent Transactions */}
       <Card className="shadow-card">

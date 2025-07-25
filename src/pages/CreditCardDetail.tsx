@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useAuth } from '@/hooks/useAuth';
+import { SmartBudgetIntegration } from '@/components/SmartBudgetIntegration';
 import { CreditCard, Transaction, CreditCardGoal, CreditCardBonus } from '@/types';
 import { ArrowLeft, CreditCard as CreditCardIcon, AlertTriangle, Calendar, Target, Gift, Plus, Edit, Percent, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
@@ -258,6 +259,9 @@ const CreditCardDetail = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Smart Budget Integration */}
+      <SmartBudgetIntegration accountId={card.id} accountType="credit" />
 
       {/* Recent Transactions */}
       <Card className="shadow-card">
