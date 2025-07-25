@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
+import { useAccountBalanceInit } from "@/hooks/useAccountBalanceInit";
 import Dashboard from "./pages/Dashboard";
 import BankAccounts from "./pages/BankAccounts";
 import BankAccountDetail from "./pages/BankAccountDetail";
@@ -20,14 +21,13 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Layout>
-          <Routes>
+const AppContent = () => {
+  // Initialize cached balances for existing accounts
+  useAccountBalanceInit();
+  
+  return (
+    <Layout>
+      <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/accounts" element={<BankAccounts />} />
             <Route path="/accounts/:accountId" element={<BankAccountDetail />} />
@@ -44,6 +44,16 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
+  );
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <AppContent />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

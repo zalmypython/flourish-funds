@@ -18,7 +18,7 @@ interface TransferModalProps {
 export const TransferModal = ({ open, onOpenChange }: TransferModalProps) => {
   const { documents: bankAccounts } = useFirestore<BankAccount>('bankAccounts');
   const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
-  const { processTransfer, processCreditCardPayment, calculateAccountBalance } = useAccountBalance();
+  const { processTransfer, processCreditCardPayment, getCachedBalance } = useAccountBalance();
 
   const [formData, setFormData] = useState({
     fromAccountId: '',
@@ -44,13 +44,7 @@ export const TransferModal = ({ open, onOpenChange }: TransferModalProps) => {
   };
 
   const getAccountBalance = (accountId: string, accountType: 'bank' | 'credit') => {
-    if (accountType === 'bank') {
-      const account = bankAccounts.find(a => a.id === accountId);
-      return account ? calculateAccountBalance(accountId, accountType, account.initialBalance) : 0;
-    } else {
-      const card = creditCards.find(c => c.id === accountId);
-      return card ? calculateAccountBalance(accountId, accountType, card.initialBalance) : 0;
-    }
+    return getCachedBalance(accountId, accountType);
   };
 
   const getAccountName = (accountId: string, accountType: 'bank' | 'credit') => {

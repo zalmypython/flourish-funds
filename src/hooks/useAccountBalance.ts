@@ -9,10 +9,22 @@ export const useAccountBalance = () => {
   const creditCardsHook = useFirestore<CreditCard>('creditCards');
   
   const { documents: transactions, addDocument: addTransaction } = transactionHook;
-  const { documents: bankAccounts } = bankAccountsHook;
-  const { documents: creditCards } = creditCardsHook;
+  const { documents: bankAccounts, updateDocument: updateBankAccount } = bankAccountsHook;
+  const { documents: creditCards, updateDocument: updateCreditCard } = creditCardsHook;
   const { toast } = useToast();
   
+  // Get cached balance - primary method for displaying balances
+  const getCachedBalance = (accountId: string, accountType: 'bank' | 'credit') => {
+    if (accountType === 'bank') {
+      const account = bankAccounts.find(a => a.id === accountId);
+      return account?.currentBalance ?? account?.initialBalance ?? 0;
+    } else {
+      const card = creditCards.find(c => c.id === accountId);
+      return card?.currentBalance ?? card?.initialBalance ?? 0;
+    }
+  };
+
+  // Calculate real-time balance from transactions (used for balance updates)
   const calculateAccountBalance = useMemo(() => {
     return (accountId: string, accountType: 'bank' | 'credit', initialBalance: number = 0) => {
       const accountTransactions = transactions.filter(
@@ -43,6 +55,34 @@ export const useAccountBalance = () => {
     };
   }, [transactions]);
 
+  // Update cached balance after transaction changes
+  const updateAccountBalance = async (accountId: string, accountType: 'bank' | 'credit') => {
+    try {
+      if (accountType === 'bank') {
+        const account = bankAccounts.find(a => a.id === accountId);
+        if (account) {
+          const newBalance = calculateAccountBalance(accountId, accountType, account.initialBalance);
+          await updateBankAccount(accountId, {
+            currentBalance: newBalance,
+            lastBalanceUpdate: new Date().toISOString(),
+            lastTransactionDate: new Date().toISOString()
+          });
+        }
+      } else {
+        const card = creditCards.find(c => c.id === accountId);
+        if (card) {
+          const newBalance = calculateAccountBalance(accountId, accountType, card.initialBalance);
+          await updateCreditCard(accountId, {
+            currentBalance: newBalance,
+            lastBalanceUpdate: new Date().toISOString()
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error updating account balance:', error);
+    }
+  };
+
   const getAccountTransactionSummary = useMemo(() => {
     return (accountId: string, accountType: 'bank' | 'credit') => {
       const accountTransactions = transactions.filter(
@@ -70,7 +110,7 @@ export const useAccountBalance = () => {
     };
   }, [transactions]);
 
-  // Enhanced transfer handling with dual account updates
+  // Simplified transfer handling with single transaction
   const processTransfer = async (
     fromAccountId: string,
     fromAccountType: 'bank' | 'credit',
@@ -83,35 +123,28 @@ export const useAccountBalance = () => {
     try {
       const date = new Date().toISOString().split('T')[0];
       
-      // Create outgoing transaction (from account)
+      // Create single transfer transaction
       await addTransaction({
         date,
         amount,
-        description: `Transfer to ${getAccountName(toAccountId, toAccountType)} - ${description}`,
+        description: `Transfer: ${getAccountName(fromAccountId, fromAccountType)} → ${getAccountName(toAccountId, toAccountType)} - ${description}`,
         category: 'transfer',
         accountId: fromAccountId,
         accountType: fromAccountType,
         type: 'transfer',
         notes,
         status: 'cleared',
-        transferToAccountId: toAccountId,
-        transferToAccountType: toAccountType
+        fromAccountId,
+        fromAccountType,
+        toAccountId,
+        toAccountType
       });
-      
-      // Create incoming transaction (to account)
-      await addTransaction({
-        date,
-        amount,
-        description: `Transfer from ${getAccountName(fromAccountId, fromAccountType)} - ${description}`,
-        category: 'transfer',
-        accountId: toAccountId,
-        accountType: toAccountType,
-        type: 'income',
-        notes,
-        status: 'cleared',
-        transferFromAccountId: fromAccountId,
-        transferFromAccountType: fromAccountType
-      });
+
+      // Update balances for both accounts
+      await Promise.all([
+        updateAccountBalance(fromAccountId, fromAccountType),
+        updateAccountBalance(toAccountId, toAccountType)
+      ]);
       
       toast({
         title: "Transfer Completed",
@@ -126,7 +159,7 @@ export const useAccountBalance = () => {
     }
   };
 
-  // Credit card payment with dual account impact
+  // Credit card payment with single transaction
   const processCreditCardPayment = async (
     creditCardId: string,
     fromBankAccountId: string,
@@ -142,31 +175,27 @@ export const useAccountBalance = () => {
         throw new Error('Account not found');
       }
       
-      // Create payment transaction for credit card (reduces balance)
+      // Create single payment transaction
       await addTransaction({
         date,
         amount,
-        description: `Payment from ${bankAccount.name} - ${description || 'Credit card payment'}`,
-        category: 'transfer',
-        accountId: creditCardId,
-        accountType: 'credit',
-        type: 'payment',
-        status: 'cleared',
-        paymentFromAccountId: fromBankAccountId
-      });
-      
-      // Create expense transaction for bank account (reduces balance)
-      await addTransaction({
-        date,
-        amount,
-        description: `Credit card payment to ${creditCard.name} - ${description || 'Payment'}`,
+        description: `Payment: ${bankAccount.name} → ${creditCard.name} - ${description || 'Credit card payment'}`,
         category: 'transfer',
         accountId: fromBankAccountId,
         accountType: 'bank',
-        type: 'expense',
+        type: 'transfer',
         status: 'cleared',
-        paymentToAccountId: creditCardId
+        fromAccountId: fromBankAccountId,
+        fromAccountType: 'bank',
+        toAccountId: creditCardId,
+        toAccountType: 'credit'
       });
+
+      // Update balances for both accounts
+      await Promise.all([
+        updateAccountBalance(fromBankAccountId, 'bank'),
+        updateAccountBalance(creditCardId, 'credit')
+      ]);
       
       toast({
         title: "Payment Processed",
@@ -181,12 +210,43 @@ export const useAccountBalance = () => {
     }
   };
 
+  // Enhanced transaction processor that updates balances
+  const addTransactionWithBalanceUpdate = async (transactionData: Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      await addTransaction(transactionData);
+      
+      // Update primary account balance
+      await updateAccountBalance(transactionData.accountId, transactionData.accountType);
+      
+      // Update secondary account balance if this is a transfer
+      if (transactionData.toAccountId && transactionData.toAccountType) {
+        await updateAccountBalance(transactionData.toAccountId, transactionData.toAccountType);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Transaction Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   // Get account name helper
   const getAccountName = (accountId: string, accountType: 'bank' | 'credit') => {
     if (accountType === 'bank') {
       return bankAccounts.find(a => a.id === accountId)?.name || 'Unknown Account';
     }
     return creditCards.find(c => c.id === accountId)?.name || 'Unknown Card';
+  };
+
+  // Get all transactions with enhanced filtering
+  const getAllTransactions = () => {
+    return transactions.map(transaction => ({
+      ...transaction,
+      accountName: getAccountName(transaction.accountId, transaction.accountType),
+      fromAccountName: transaction.fromAccountId ? getAccountName(transaction.fromAccountId, transaction.fromAccountType || 'bank') : undefined,
+      toAccountName: transaction.toAccountId ? getAccountName(transaction.toAccountId, transaction.toAccountType || 'bank') : undefined
+    }));
   };
 
   // Get suggested transactions based on history
@@ -227,12 +287,16 @@ export const useAccountBalance = () => {
   };
 
   return {
+    getCachedBalance,
     calculateAccountBalance,
+    updateAccountBalance,
+    addTransactionWithBalanceUpdate,
     getAccountTransactionSummary,
     processTransfer,
     processCreditCardPayment,
     getSuggestedTransactions,
     getSpendingVelocity,
-    getAccountName
+    getAccountName,
+    getAllTransactions
   };
 };

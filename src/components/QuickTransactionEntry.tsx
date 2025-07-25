@@ -18,8 +18,7 @@ interface QuickTransactionEntryProps {
 export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransactionEntryProps) => {
   const { documents: bankAccounts } = useFirestore<BankAccount>('bankAccounts');
   const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
-  const { addDocument: addTransaction } = useFirestore<Transaction>('transactions');
-  const { getSuggestedTransactions } = useAccountBalance();
+  const { getSuggestedTransactions, addTransactionWithBalanceUpdate } = useAccountBalance();
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -42,7 +41,7 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
 
     setIsSubmitting(true);
     try {
-      await addTransaction({
+      await addTransactionWithBalanceUpdate({
         date: new Date().toISOString().split('T')[0],
         amount: parseFloat(formData.amount),
         description: formData.description,

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useFirestore } from '@/hooks/useFirestore';
+import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { Transaction, DEFAULT_CATEGORIES, BankAccount, CreditCard } from '@/types';
 import { AuthModal } from '@/components/AuthModal';
 import { TransferModal } from '@/components/TransferModal';
 import { QuickTransactionEntry } from '@/components/QuickTransactionEntry';
+import { EnhancedTransactionList } from '@/components/EnhancedTransactionList';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,9 +22,10 @@ import { format } from 'date-fns';
 
 export const Transactions = () => {
   const { user } = useAuth();
-  const { documents: transactions, loading, addDocument, deleteDocument } = useFirestore<Transaction>('transactions');
+  const { documents: transactions, loading, deleteDocument } = useFirestore<Transaction>('transactions');
   const { documents: bankAccounts } = useFirestore<BankAccount>('bankAccounts');
   const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
+  const { addTransactionWithBalanceUpdate } = useAccountBalance();
   
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -64,7 +67,7 @@ export const Transactions = () => {
   const handleAddTransaction = async () => {
     if (!formData.amount || !formData.description || !formData.accountId) return;
 
-    await addDocument({
+    await addTransactionWithBalanceUpdate({
       date: formData.date,
       amount: parseFloat(formData.amount),
       description: formData.description,
@@ -440,60 +443,8 @@ export const Transactions = () => {
         </CardContent>
       </Card>
 
-      {/* Transactions List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Transactions</CardTitle>
-          <CardDescription>
-            {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {filteredTransactions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No transactions found. Add your first transaction to get started.
-              </div>
-            ) : (
-              filteredTransactions.map((transaction) => (
-                <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    <div className={`p-2 rounded-full`} style={{ backgroundColor: `${DEFAULT_CATEGORIES.find(c => c.id === transaction.category)?.color}20` }}>
-                      <div className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{transaction.description}</p>
-                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                        <span>{getAccountName(transaction.accountId, transaction.accountType)}</span>
-                        <Separator orientation="vertical" className="h-3" />
-                        <span>{DEFAULT_CATEGORIES.find(c => c.id === transaction.category)?.name}</span>
-                        <Separator orientation="vertical" className="h-3" />
-                        <span>{format(new Date(transaction.date), 'MMM dd, yyyy')}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-4">
-                    <Badge variant={transaction.status === 'cleared' ? 'default' : 'secondary'}>
-                      {transaction.status}
-                    </Badge>
-                    <div className={`text-lg font-semibold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatAmount(transaction.amount, transaction.type)}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteDocument(transaction.id)}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Enhanced Transaction List */}
+      <EnhancedTransactionList />
     </div>
   );
 };

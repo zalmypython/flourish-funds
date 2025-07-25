@@ -16,14 +16,11 @@ export interface Transaction extends FirebaseDocument {
   status: 'pending' | 'cleared' | 'reconciled';
   merchantName?: string;
   location?: string;
-  // Enhanced transfer tracking
-  transferToAccountId?: string;
-  transferToAccountType?: 'bank' | 'credit';
-  transferFromAccountId?: string;
-  transferFromAccountType?: 'bank' | 'credit';
-  // Payment tracking
-  paymentToAccountId?: string;
-  paymentFromAccountId?: string;
+  // Simplified transfer tracking - single transaction approach
+  fromAccountId?: string;
+  fromAccountType?: 'bank' | 'credit';
+  toAccountId?: string;
+  toAccountType?: 'bank' | 'credit';
   // Receipt and location data
   receiptUrl?: string;
   gpsLocation?: {
@@ -89,6 +86,9 @@ export interface BankAccount extends FirebaseDocument {
   lastTransactionDate?: string;
   statementDate?: string;
   anniversaryDate?: string;
+  // Cached balance for performance
+  currentBalance: number;
+  lastBalanceUpdate: string;
 }
 
 export interface CreditCardBonus {
@@ -144,6 +144,9 @@ export interface CreditCard extends FirebaseDocument {
   approvalDate?: string;
   lastPaymentDate?: string;
   anniversaryDate?: string;
+  // Cached balance for performance
+  currentBalance: number;
+  lastBalanceUpdate: string;
 }
 
 export const DEFAULT_CATEGORIES: TransactionCategory[] = [
