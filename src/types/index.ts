@@ -197,6 +197,48 @@ export interface CreditCard extends FirebaseDocument {
   }[];
 }
 
+// Stock Portfolio Types
+export interface Stock {
+  symbol: string;
+  name: string;
+  sector?: string;
+  currentPrice: number;
+  lastUpdated: Date;
+  change?: number;
+  changePercent?: number;
+}
+
+export interface StockHolding extends FirebaseDocument {
+  stockSymbol: string;
+  stockName: string;
+  shares: number;
+  averageCostBasis: number;
+  totalValue: number;
+  accountId: string; // Bank account used for purchases
+}
+
+export interface StockTransaction extends FirebaseDocument {
+  type: 'buy' | 'sell';
+  stockSymbol: string;
+  stockName: string;
+  shares: number;
+  price: number;
+  fees: number;
+  totalAmount: number;
+  accountId: string; // Bank account affected
+  transactionId?: string; // Link to regular transaction
+  date: string;
+}
+
+export interface Portfolio {
+  holdings: StockHolding[];
+  totalValue: number;
+  totalGainLoss: number;
+  totalGainLossPercent: number;
+  dailyChange: number;
+  dailyChangePercent: number;
+}
+
 export const DEFAULT_CATEGORIES: TransactionCategory[] = [
   { id: 'food', name: 'Food & Dining', icon: 'UtensilsCrossed', color: '#e74c3c' },
   { id: 'transportation', name: 'Transportation', icon: 'Car', color: '#3498db' },
@@ -205,6 +247,7 @@ export const DEFAULT_CATEGORIES: TransactionCategory[] = [
   { id: 'bills', name: 'Bills & Utilities', icon: 'FileText', color: '#f39c12' },
   { id: 'healthcare', name: 'Healthcare', icon: 'Heart', color: '#e74c3c' },
   { id: 'income', name: 'Income', icon: 'TrendingUp', color: '#27ae60' },
+  { id: 'stocks', name: 'Stocks', icon: 'TrendingUp', color: '#8b5cf6' },
   { id: 'transfer', name: 'Transfer', icon: 'ArrowRightLeft', color: '#95a5a6' },
   { id: 'other', name: 'Other', icon: 'MoreHorizontal', color: '#7f8c8d' }
 ];

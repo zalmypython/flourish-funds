@@ -9,7 +9,8 @@ import {
   Repeat,
   Settings,
   FileText,
-  Receipt
+  Receipt,
+  BarChart3
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -34,6 +35,7 @@ const mainItems = [
 ];
 
 const toolsItems = [
+  { title: "Portfolio", url: "/portfolio", icon: BarChart3 },
   { title: "Savings Goals", url: "/goals", icon: Target },
   { title: "Net Worth", url: "/net-worth", icon: TrendingUp },
   { title: "Recurring Payments", url: "/recurring", icon: Repeat },

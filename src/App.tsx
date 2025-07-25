@@ -12,6 +12,7 @@ import CreditCards from "./pages/CreditCards";
 import CreditCardDetail from "./pages/CreditCardDetail";
 import Budgets from "./pages/Budgets";
 import SavingsGoals from "./pages/SavingsGoals";
+import Portfolio from "./pages/Portfolio";
 import NetWorth from "./pages/NetWorth";
 import RecurringPayments from "./pages/RecurringPayments";
 import Reports from "./pages/Reports";
@@ -35,6 +36,7 @@ const AppContent = () => {
             <Route path="/credit-cards/:cardId" element={<CreditCardDetail />} />
             <Route path="/budgets" element={<Budgets />} />
             <Route path="/goals" element={<SavingsGoals />} />
+            <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/net-worth" element={<NetWorth />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/recurring" element={<RecurringPayments />} />
