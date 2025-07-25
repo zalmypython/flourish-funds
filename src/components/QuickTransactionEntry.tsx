@@ -4,11 +4,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { useFirestore } from '@/hooks/useFirestore';
+import { useFirestore, FirebaseDocument } from '@/hooks/useFirestore';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useToast } from '@/hooks/use-toast';
 import { Transaction, BankAccount, CreditCard, DEFAULT_CATEGORIES } from '@/types';
 import { Zap, Plus, Clock } from 'lucide-react';
+
+interface Budget extends FirebaseDocument {
+  name: string;
+  category: string;
+  amount: number;
+  spent: number;
+  period: 'weekly' | 'monthly' | 'yearly';
+  startDate: string;
+  endDate: string;
+  alertThreshold: number;
+  status: 'active' | 'exceeded' | 'completed';
+}
 
 interface QuickTransactionEntryProps {
   accountId?: string;
@@ -18,17 +30,21 @@ interface QuickTransactionEntryProps {
 export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransactionEntryProps) => {
   const { documents: bankAccounts } = useFirestore<BankAccount>('bankAccounts');
   const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
+  const { documents: budgets } = useFirestore<Budget>('budgets');
   const { getSuggestedTransactions, addTransactionWithBalanceUpdate } = useAccountBalance();
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     amount: '',
     description: '',
-    category: '',
+    budgetId: '',
     accountId: accountId || '',
     accountType: accountType || 'bank' as 'bank' | 'credit',
     type: 'expense' as 'income' | 'expense'
   });
+
+  // Get active budgets for expenses
+  const activeBudgets = budgets.filter(budget => budget.status === 'active');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -38,14 +54,29 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
 
   const handleQuickAdd = async () => {
     if (!formData.amount || !formData.description || !formData.accountId) return;
+    
+    // For expenses, check if budget is selected
+    if (formData.type === 'expense' && !formData.budgetId) {
+      toast({
+        title: "Budget Required",
+        description: "Please select a budget for expense transactions.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
+      // For expenses, use budget's category. For income, use 'income' category
+      const category = formData.type === 'expense' && formData.budgetId
+        ? budgets.find(b => b.id === formData.budgetId)?.category || 'other'
+        : 'income';
+
       await addTransactionWithBalanceUpdate({
         date: new Date().toISOString().split('T')[0],
         amount: parseFloat(formData.amount),
         description: formData.description,
-        category: formData.category || 'other',
+        category,
         accountId: formData.accountId,
         accountType: formData.accountType,
         type: formData.type,
@@ -56,7 +87,7 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
       setFormData({
         amount: '',
         description: '',
-        category: '',
+        budgetId: '',
         accountId: accountId || '',
         accountType: accountType || 'bank',
         type: 'expense'
@@ -79,10 +110,15 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
   };
 
   const handleSuggestedTransaction = (transaction: Transaction) => {
+    // Find budget by category for expenses
+    const budget = transaction.type === 'expense' 
+      ? budgets.find(b => b.category === transaction.category && b.status === 'active')
+      : null;
+
     setFormData({
       amount: transaction.amount.toString(),
       description: transaction.description,
-      category: transaction.category,
+      budgetId: budget?.id || '',
       accountId: formData.accountId,
       accountType: formData.accountType,
       type: transaction.type === 'transfer' || transaction.type === 'payment' ? 'expense' : transaction.type
@@ -132,7 +168,10 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
                       ${transaction.amount}
                     </Badge>
                     <Badge variant="outline" className="text-xs">
-                      {DEFAULT_CATEGORIES.find(c => c.id === transaction.category)?.name}
+                      {transaction.type === 'expense' 
+                        ? budgets.find(b => b.category === transaction.category)?.name || 'No Budget'
+                        : 'Income'
+                      }
                     </Badge>
                   </div>
                 </Button>
@@ -168,18 +207,24 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
             </SelectContent>
           </Select>
           
-          <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              {DEFAULT_CATEGORIES.map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+{formData.type === 'expense' ? (
+            <Select value={formData.budgetId} onValueChange={(value) => setFormData({ ...formData, budgetId: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Budget" />
+              </SelectTrigger>
+              <SelectContent>
+                {activeBudgets.map((budget) => (
+                  <SelectItem key={budget.id} value={budget.id}>
+                    {budget.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex items-center justify-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
+              No budget needed for income
+            </div>
+          )}
         </div>
 
         {/* Account Selection (only if not fixed) */}
