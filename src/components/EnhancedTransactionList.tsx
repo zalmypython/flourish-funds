@@ -5,13 +5,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { useFirestore } from '@/hooks/useFirestore';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
-import { DEFAULT_CATEGORIES } from '@/types';
+import { DEFAULT_CATEGORIES, Transaction } from '@/types';
 import { Search, Filter, Calendar, ArrowUpDown, Trash2, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 
 export const EnhancedTransactionList = () => {
   const { getAllTransactions } = useAccountBalance();
+  const { deleteDocument } = useFirestore<Transaction>('transactions');
   const [showAmounts, setShowAmounts] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -51,9 +53,11 @@ export const EnhancedTransactionList = () => {
   });
 
   // Get unique accounts for filter dropdown
-  const uniqueAccounts = Array.from(
-    new Set(allTransactions.map(t => ({ id: t.accountId, name: t.accountName, type: t.accountType })))
-  );
+  const accountMap = new Map();
+  allTransactions.forEach(t => {
+    accountMap.set(t.accountId, { id: t.accountId, name: t.accountName, type: t.accountType });
+  });
+  const uniqueAccounts = Array.from(accountMap.values());
 
   const formatAmount = (amount: number, type: string) => {
     const formatted = showAmounts ? `$${amount.toFixed(2)}` : '••••';
@@ -246,7 +250,11 @@ export const EnhancedTransactionList = () => {
                         {formatAmount(transaction.amount, transaction.type)}
                       </span>
                       
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => deleteDocument(transaction.id)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
