@@ -206,13 +206,16 @@ const CreditCards = () => {
           <p className="text-muted-foreground mt-1">Track credit cards, balances, and rewards</p>
         </div>
         <div className="flex items-center gap-4">
-          <Button
-            variant="outline" 
-            onClick={() => setShowInactive(!showInactive)}
-          >
-            <Archive className="h-4 w-4 mr-2" />
-            {showInactive ? 'Hide' : 'Show'} Inactive ({inactiveCards.length})
-          </Button>
+          {inactiveCards.length > 0 && (
+            <Button
+              variant={showInactive ? "default" : "outline"}
+              onClick={() => setShowInactive(!showInactive)}
+              className="gap-2"
+            >
+              <Archive className="h-4 w-4" />
+              {showInactive ? 'Hide' : 'Show'} Inactive Cards ({inactiveCards.length})
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => setShowBalances(!showBalances)}
