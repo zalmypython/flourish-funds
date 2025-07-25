@@ -97,12 +97,18 @@ export interface CreditCardBonus {
   description: string;
   requirement: string;
   bonusAmount: string; // e.g., "80,000 points" or "$500 cash back"
+  bonusValue?: number; // Estimated cash value
   spendingRequired: number;
   currentSpending: number;
   startDate: string;
   endDate: string;
-  status: 'active' | 'completed' | 'expired';
+  status: 'not_started' | 'in_progress' | 'completed' | 'paid_out' | 'expired';
   category?: string; // e.g., "dining", "travel", "general"
+  categoryMultiplier?: number; // e.g., 3x points for dining
+  dateCompleted?: string;
+  datePaidOut?: string;
+  actualValueReceived?: number;
+  notes?: string;
 }
 
 export interface CreditCardGoal {
@@ -128,8 +134,11 @@ export interface CreditCard extends FirebaseDocument {
   interestRate: number;
   isActive: boolean;
   bonuses: CreditCardBonus[];
-  // Enhanced fields
+  // Enhanced fields for churning
   annualFee?: number;
+  annualFeeWaived?: boolean;
+  annualFeeWaivedFirstYear?: boolean;
+  nextAnnualFeeDate?: string;
   rewardRate?: number;
   color?: string;
   nickname?: string;
@@ -139,11 +148,20 @@ export interface CreditCard extends FirebaseDocument {
   paymentDueDay?: number;
   // Goal tracking
   goals?: CreditCardGoal[];
-  // Date tracking
+  // Enhanced date tracking for churning
   applicationDate?: string;
   approvalDate?: string;
+  accountOpenDate?: string;
+  accountCloseDate?: string;
   lastPaymentDate?: string;
   anniversaryDate?: string;
+  // Status tracking
+  accountStatus: 'active' | 'inactive' | 'closed' | 'pending_approval' | 'denied';
+  closureReason?: string;
+  // Business rules tracking
+  eligibleForSignupBonus?: boolean;
+  lastSignupBonusDate?: string;
+  churningNotes?: string;
   // Cached balance for performance
   currentBalance: number;
   lastBalanceUpdate: string;

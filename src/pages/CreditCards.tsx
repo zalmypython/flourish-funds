@@ -1,65 +1,48 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, FirebaseDocument } from "@/hooks/useFirestore";
+import { useFirestore } from "@/hooks/useFirestore";
 import { AuthModal } from "@/components/AuthModal";
+import { EnhancedCreditCardForm } from "@/components/EnhancedCreditCardForm";
 import { useAuth } from "@/hooks/useAuth";
 import { useAccountBalance } from "@/hooks/useAccountBalance";
+import { CreditCard } from "@/types";
 import { 
   Plus, 
-  CreditCard, 
+  CreditCard as CreditCardIcon, 
   AlertTriangle,
   Calendar,
   Percent,
-  MoreHorizontal,
   Eye,
   EyeOff,
   Edit,
   Trash2,
   LogIn,
   RotateCcw,
-  Archive
+  Archive,
+  Building2,
+  TrendingUp,
+  Award,
+  DollarSign
 } from "lucide-react";
 
-interface CreditCardData extends FirebaseDocument {
-  name: string;
-  issuer: string;
-  type: string;
-  limit: number;
-  initialBalance: number;
-  dueDate: string;
-  interestRate: number;
-  isActive: boolean;
-  bonuses: {
-    id: string;
-    description: string;
-    status: "In Progress" | "Completed" | "Expired";
-    requirement?: string;
-  }[];
-}
 
 const CreditCards = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
-  const { documents: cards, loading, addDocument, updateDocument, deleteDocument } = useFirestore<CreditCardData>("creditCards");
+  const { documents: cards, loading, addDocument, updateDocument, deleteDocument } = useFirestore<CreditCard>("creditCards");
   const { calculateAccountBalance, getAccountTransactionSummary } = useAccountBalance();
   const [showBalances, setShowBalances] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    issuer: "",
-    type: "",
-    limit: "",
-    interestRate: ""
-  });
+  const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
+  const [currentView, setCurrentView] = useState<'grid' | 'company'>('grid');
 
   const { toast } = useToast();
 
@@ -123,6 +106,17 @@ const CreditCards = () => {
   }, 0);
   const totalLimit = activeCards.reduce((sum, card) => sum + card.limit, 0);
   const utilization = totalLimit > 0 ? (totalBalance / totalLimit) * 100 : 0;
+  const activeBonuses = activeCards.flatMap(card => card.bonuses || []).filter(bonus => bonus.status === 'in_progress');
+  const completedBonuses = activeCards.flatMap(card => card.bonuses || []).filter(bonus => bonus.status === 'completed');
+
+  // Group cards by issuer for company view
+  const cardsByIssuer = activeCards.reduce((acc, card) => {
+    if (!acc[card.issuer]) {
+      acc[card.issuer] = [];
+    }
+    acc[card.issuer].push(card);
+    return acc;
+  }, {} as Record<string, CreditCard[]>);
 
   const getUtilizationColor = (utilization: number) => {
     if (utilization < 30) return "text-success";
@@ -130,11 +124,12 @@ const CreditCards = () => {
     return "text-destructive";
   };
 
-  const getStatusColor = (status: string) => {
+  const getBonusStatusColor = (status: string) => {
     switch (status) {
-      case "Completed": return "bg-success text-success-foreground";
-      case "In Progress": return "bg-warning text-warning-foreground";
-      case "Expired": return "bg-destructive text-destructive-foreground";
+      case 'completed': return "bg-success text-success-foreground";
+      case 'in_progress': return "bg-warning text-warning-foreground";
+      case 'paid_out': return "bg-primary text-primary-foreground";
+      case 'expired': return "bg-destructive text-destructive-foreground";
       default: return "bg-muted text-muted-foreground";
     }
   };
@@ -148,31 +143,39 @@ const CreditCards = () => {
     }
   };
 
-  const handleAddCard = async () => {
-    if (!formData.name || !formData.issuer || !formData.type || !formData.limit || !formData.interestRate) {
+  const handleAddCard = async (cardData: Partial<CreditCard>) => {
+    try {
+      await addDocument({
+        ...cardData,
+        initialBalance: 0,
+        currentBalance: 0,
+        lastBalanceUpdate: new Date().toISOString(),
+        accountStatus: 'active' as const
+      } as Omit<CreditCard, 'id' | 'userId' | 'createdAt' | 'updatedAt'>);
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields.",
+        description: error.message,
         variant: "destructive"
       });
-      return;
+      throw error;
     }
+  };
 
-    const newCard = {
-      name: formData.name,
-      issuer: formData.issuer,
-      type: formData.type,
-      limit: parseFloat(formData.limit),
-      initialBalance: 0,
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      interestRate: parseFloat(formData.interestRate),
-      isActive: true,
-      bonuses: []
-    };
-
-    await addDocument(newCard);
-    setFormData({ name: "", issuer: "", type: "", limit: "", interestRate: "" });
-    setIsAddDialogOpen(false);
+  const handleEditCard = async (cardData: Partial<CreditCard>) => {
+    if (!editingCard) return;
+    
+    try {
+      await updateDocument(editingCard.id, cardData);
+      setEditingCard(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+      throw error;
+    }
   };
 
   const handleDeleteCard = async (cardId: string) => {
@@ -224,80 +227,30 @@ const CreditCards = () => {
             {showBalances ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             {showBalances ? "Hide" : "Show"} Balances
           </Button>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-primary text-primary-foreground hover:scale-105 shadow-elegant">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Card
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Credit Card</DialogTitle>
-                <DialogDescription>
-                  Add a credit card to track spending and rewards
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="cardName">Card Name</Label>
-                  <Input 
-                    id="cardName" 
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g. Chase Sapphire Preferred" 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="issuer">Issuer</Label>
-                  <Input 
-                    id="issuer" 
-                    value={formData.issuer}
-                    onChange={(e) => setFormData(prev => ({ ...prev, issuer: e.target.value }))}
-                    placeholder="e.g. Chase, Citi, American Express" 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cardType">Card Type</Label>
-                  <Select value={formData.type} onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select card type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Cashback">Cashback</SelectItem>
-                      <SelectItem value="Travel">Travel</SelectItem>
-                      <SelectItem value="Rewards">Rewards</SelectItem>
-                      <SelectItem value="Business">Business</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="limit">Credit Limit</Label>
-                    <Input 
-                      id="limit" 
-                      type="number" 
-                      value={formData.limit}
-                      onChange={(e) => setFormData(prev => ({ ...prev, limit: e.target.value }))}
-                      placeholder="10000" 
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="interestRate">Interest Rate (%)</Label>
-                    <Input 
-                      id="interestRate" 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.interestRate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, interestRate: e.target.value }))}
-                      placeholder="19.99" 
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleAddCard} className="w-full">Add Card</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-2">
+            <Button 
+              variant={currentView === 'grid' ? 'default' : 'outline'}
+              onClick={() => setCurrentView('grid')}
+              size="sm"
+            >
+              Grid View
+            </Button>
+            <Button 
+              variant={currentView === 'company' ? 'default' : 'outline'}
+              onClick={() => setCurrentView('company')}
+              size="sm"
+            >
+              <Building2 className="h-4 w-4 mr-2" />
+              By Company
+            </Button>
+            <Button 
+              className="bg-gradient-primary text-primary-foreground hover:scale-105 shadow-elegant"
+              onClick={() => setIsAddDialogOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Card
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -345,7 +298,7 @@ const CreditCards = () => {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-warning">
-              {activeCards.flatMap(card => card.bonuses).filter(bonus => bonus.status === "In Progress").length}
+              {activeBonuses.length}
             </p>
             <p className="text-sm text-muted-foreground mt-1">In progress</p>
           </CardContent>
@@ -365,7 +318,7 @@ const CreditCards = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${getCardTypeColor(card.type)}`}>
-                        <CreditCard className="h-4 w-4" />
+                        <CreditCardIcon className="h-4 w-4" />
                       </div>
                       <div>
                         <CardTitle className="text-base">{card.name}</CardTitle>
@@ -430,8 +383,8 @@ const CreditCards = () => {
                                 <p className="text-xs text-muted-foreground">{bonus.requirement}</p>
                               )}
                             </div>
-                            <Badge className={getStatusColor(bonus.status)}>
-                              {bonus.status}
+                            <Badge className={getBonusStatusColor(bonus.status)}>
+                              {bonus.status.replace('_', ' ')}
                             </Badge>
                           </div>
                         ))}
@@ -470,7 +423,7 @@ const CreditCards = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${getCardTypeColor(card.type)} opacity-50`}>
-                        <CreditCard className="h-4 w-4" />
+                        <CreditCardIcon className="h-4 w-4" />
                       </div>
                       <div>
                         <h3 className="font-medium text-foreground">{card.name}</h3>
@@ -501,6 +454,20 @@ const CreditCards = () => {
           </div>
         </div>
       )}
+
+      {/* Enhanced Form Dialogs */}
+      <EnhancedCreditCardForm 
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSubmit={handleAddCard}
+      />
+      
+      <EnhancedCreditCardForm 
+        open={!!editingCard}
+        onOpenChange={(open) => !open && setEditingCard(null)}
+        onSubmit={handleEditCard}
+        editCard={editingCard}
+      />
     </div>
   );
 };

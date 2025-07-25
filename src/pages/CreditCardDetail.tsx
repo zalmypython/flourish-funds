@@ -9,6 +9,7 @@ import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useAuth } from '@/hooks/useAuth';
 import { SmartBudgetIntegration } from '@/components/SmartBudgetIntegration';
 import { AccountGoalsManager } from '@/components/AccountGoalsManager';
+import { CreditCardBonusManager } from '@/components/CreditCardBonusManager';
 import { CreditCard, Transaction, CreditCardGoal, CreditCardBonus } from '@/types';
 import { ArrowLeft, CreditCard as CreditCardIcon, AlertTriangle, Calendar, Target, Gift, Plus, Edit, Percent, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
@@ -49,7 +50,7 @@ const CreditCardDetail = () => {
   const availableCredit = card.limit - currentBalance;
 
   const activeGoals = card.goals?.filter(goal => goal.status === 'active') || [];
-  const activeBonuses = card.bonuses?.filter(bonus => bonus.status === 'active') || [];
+  const activeBonuses = card.bonuses?.filter(bonus => bonus.status === 'in_progress') || [];
 
   const getUtilizationColor = (util: number) => {
     if (util < 30) return 'text-success';
@@ -164,102 +165,55 @@ const CreditCardDetail = () => {
         </CardContent>
       </Card>
 
-      {/* Goals & Bonuses */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Active Bonuses */}
-        <Card className="shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Sign-up Bonuses</CardTitle>
-              <CardDescription>Track your credit card rewards</CardDescription>
-            </div>
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Bonus
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {activeBonuses.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <Gift className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No active bonuses</p>
-                <p className="text-sm">Track signup bonuses and reward goals</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {activeBonuses.map((bonus) => {
-                  const progress = getBonusProgress(bonus);
-                  return (
-                    <div key={bonus.id} className="space-y-3 p-3 border rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{bonus.title}</p>
-                          <p className="text-sm text-muted-foreground">{bonus.description}</p>
-                        </div>
-                        <Badge variant="secondary">{bonus.bonusAmount}</Badge>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Spending Progress</span>
-                          <span>${bonus.currentSpending.toLocaleString()} / ${bonus.spendingRequired.toLocaleString()}</span>
-                        </div>
-                        <Progress value={progress} className="h-2" />
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>{progress.toFixed(1)}% complete</span>
-                          <span>Ends {format(new Date(bonus.endDate), 'MMM dd, yyyy')}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Enhanced Bonus Management */}
+      <CreditCardBonusManager 
+        cardId={card.id}
+        bonuses={card.bonuses || []}
+        onBonusUpdate={() => window.location.reload()}
+      />
 
-        {/* Active Goals */}
-        <Card className="shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Card Goals</CardTitle>
-              <CardDescription>Track utilization and payment goals</CardDescription>
+      {/* Active Goals */}
+      <Card className="shadow-card">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Card Goals</CardTitle>
+            <CardDescription>Track utilization and payment goals</CardDescription>
+          </div>
+          <Button size="sm" variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Goal
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {activeGoals.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground">
+              <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No active goals</p>
+              <p className="text-sm">Set utilization or payment goals</p>
             </div>
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Goal
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {activeGoals.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No active goals</p>
-                <p className="text-sm">Set utilization or payment goals</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {activeGoals.map((goal) => (
-                  <div key={goal.id} className="space-y-2 p-3 border rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{goal.title}</p>
-                        <p className="text-sm text-muted-foreground">{goal.description}</p>
-                      </div>
-                      <Badge variant={goal.priority === 'high' ? 'destructive' : goal.priority === 'medium' ? 'default' : 'secondary'}>
-                        {goal.priority}
-                      </Badge>
+          ) : (
+            <div className="space-y-4">
+              {activeGoals.map((goal) => (
+                <div key={goal.id} className="space-y-2 p-3 border rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{goal.title}</p>
+                      <p className="text-sm text-muted-foreground">{goal.description}</p>
                     </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Due {format(new Date(goal.endDate), 'MMM dd, yyyy')}</span>
-                      <span className="capitalize">{goal.type.replace('_', ' ')}</span>
-                    </div>
+                    <Badge variant={goal.priority === 'high' ? 'destructive' : goal.priority === 'medium' ? 'default' : 'secondary'}>
+                      {goal.priority}
+                    </Badge>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Due {format(new Date(goal.endDate), 'MMM dd, yyyy')}</span>
+                    <span className="capitalize">{goal.type.replace('_', ' ')}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Account Goals Manager */}
       <AccountGoalsManager 
