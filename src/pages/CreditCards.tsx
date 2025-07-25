@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Plus, 
   CreditCard, 
@@ -15,7 +16,9 @@ import {
   Percent,
   MoreHorizontal,
   Eye,
-  EyeOff
+  EyeOff,
+  Edit,
+  Trash2
 } from "lucide-react";
 
 interface CreditCardData {
@@ -91,6 +94,16 @@ const CreditCards = () => {
   ]);
 
   const [showBalances, setShowBalances] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    issuer: "",
+    type: "",
+    limit: "",
+    interestRate: ""
+  });
+
+  const { toast } = useToast();
 
   const activeCards = cards.filter(card => card.isActive);
   const inactiveCards = cards.filter(card => !card.isActive);
@@ -122,6 +135,63 @@ const CreditCards = () => {
     }
   };
 
+  const handleAddCard = () => {
+    if (!formData.name || !formData.issuer || !formData.type || !formData.limit || !formData.interestRate) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newCard: CreditCardData = {
+      id: Date.now().toString(),
+      name: formData.name,
+      issuer: formData.issuer,
+      type: formData.type,
+      limit: parseFloat(formData.limit),
+      balance: 0,
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+      interestRate: parseFloat(formData.interestRate),
+      isActive: true,
+      bonuses: []
+    };
+
+    setCards(prev => [...prev, newCard]);
+    setFormData({ name: "", issuer: "", type: "", limit: "", interestRate: "" });
+    setIsAddDialogOpen(false);
+    
+    toast({
+      title: "Success",
+      description: `${formData.name} has been added to your credit cards.`
+    });
+  };
+
+  const handleDeleteCard = (cardId: string) => {
+    const card = cards.find(c => c.id === cardId);
+    setCards(prev => prev.filter(c => c.id !== cardId));
+    
+    toast({
+      title: "Card Deleted",
+      description: `${card?.name} has been removed from your credit cards.`
+    });
+  };
+
+  const handleToggleCardStatus = (cardId: string) => {
+    setCards(prev => prev.map(card => 
+      card.id === cardId 
+        ? { ...card, isActive: !card.isActive }
+        : card
+    ));
+
+    const card = cards.find(c => c.id === cardId);
+    toast({
+      title: card?.isActive ? "Card Deactivated" : "Card Activated",
+      description: `${card?.name} has been ${card?.isActive ? 'deactivated' : 'activated'}.`
+    });
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -139,7 +209,7 @@ const CreditCards = () => {
             {showBalances ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             {showBalances ? "Hide" : "Show"} Balances
           </Button>
-          <Dialog>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-primary text-primary-foreground hover:scale-105 shadow-elegant">
                 <Plus className="h-4 w-4 mr-2" />
@@ -156,37 +226,60 @@ const CreditCards = () => {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="cardName">Card Name</Label>
-                  <Input id="cardName" placeholder="e.g. Chase Sapphire Preferred" />
+                  <Input 
+                    id="cardName" 
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Chase Sapphire Preferred" 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="issuer">Issuer</Label>
-                  <Input id="issuer" placeholder="e.g. Chase, Citi, American Express" />
+                  <Input 
+                    id="issuer" 
+                    value={formData.issuer}
+                    onChange={(e) => setFormData(prev => ({ ...prev, issuer: e.target.value }))}
+                    placeholder="e.g. Chase, Citi, American Express" 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="cardType">Card Type</Label>
-                  <Select>
+                  <Select value={formData.type} onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select card type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cashback">Cashback</SelectItem>
-                      <SelectItem value="travel">Travel</SelectItem>
-                      <SelectItem value="rewards">Rewards</SelectItem>
-                      <SelectItem value="business">Business</SelectItem>
+                      <SelectItem value="Cashback">Cashback</SelectItem>
+                      <SelectItem value="Travel">Travel</SelectItem>
+                      <SelectItem value="Rewards">Rewards</SelectItem>
+                      <SelectItem value="Business">Business</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="limit">Credit Limit</Label>
-                    <Input id="limit" type="number" placeholder="10000" />
+                    <Input 
+                      id="limit" 
+                      type="number" 
+                      value={formData.limit}
+                      onChange={(e) => setFormData(prev => ({ ...prev, limit: e.target.value }))}
+                      placeholder="10000" 
+                    />
                   </div>
                   <div>
                     <Label htmlFor="interestRate">Interest Rate (%)</Label>
-                    <Input id="interestRate" type="number" step="0.01" placeholder="19.99" />
+                    <Input 
+                      id="interestRate" 
+                      type="number" 
+                      step="0.01" 
+                      value={formData.interestRate}
+                      onChange={(e) => setFormData(prev => ({ ...prev, interestRate: e.target.value }))}
+                      placeholder="19.99" 
+                    />
                   </div>
                 </div>
-                <Button className="w-full">Add Card</Button>
+                <Button onClick={handleAddCard} className="w-full">Add Card</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -263,9 +356,14 @@ const CreditCards = () => {
                         <CardDescription>{card.issuer} • {card.type}</CardDescription>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleToggleCardStatus(card.id)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteCard(card.id)} className="text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">

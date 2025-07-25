@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Plus, 
   Wallet, 
@@ -71,6 +72,15 @@ const BankAccounts = () => {
   ]);
 
   const [showBalances, setShowBalances] = useState(true);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    type: "",
+    balance: "",
+    accountNumber: ""
+  });
+
+  const { toast } = useToast();
 
   const activeAccounts = accounts.filter(account => account.isActive);
   const closedAccounts = accounts.filter(account => !account.isActive);
@@ -90,6 +100,64 @@ const BankAccounts = () => {
     return <Wallet className="h-4 w-4" />;
   };
 
+  const handleAddAccount = () => {
+    if (!formData.name || !formData.type || !formData.balance || !formData.accountNumber) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newAccount: BankAccount = {
+      id: Date.now().toString(),
+      name: formData.name,
+      type: formData.type,
+      balance: parseFloat(formData.balance),
+      accountNumber: `****${formData.accountNumber}`,
+      isActive: true,
+      createdDate: new Date().toISOString().split('T')[0]
+    };
+
+    setAccounts(prev => [...prev, newAccount]);
+    setFormData({ name: "", type: "", balance: "", accountNumber: "" });
+    setIsAddDialogOpen(false);
+    
+    toast({
+      title: "Success",
+      description: `${formData.name} has been added to your accounts.`
+    });
+  };
+
+  const handleDeleteAccount = (accountId: string) => {
+    const account = accounts.find(a => a.id === accountId);
+    setAccounts(prev => prev.filter(a => a.id !== accountId));
+    
+    toast({
+      title: "Account Deleted",
+      description: `${account?.name} has been removed from your accounts.`
+    });
+  };
+
+  const handleToggleAccountStatus = (accountId: string) => {
+    setAccounts(prev => prev.map(account => 
+      account.id === accountId 
+        ? { 
+            ...account, 
+            isActive: !account.isActive,
+            closedDate: !account.isActive ? undefined : new Date().toISOString().split('T')[0]
+          }
+        : account
+    ));
+
+    const account = accounts.find(a => a.id === accountId);
+    toast({
+      title: account?.isActive ? "Account Closed" : "Account Reopened",
+      description: `${account?.name} has been ${account?.isActive ? 'closed' : 'reopened'}.`
+    });
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -107,7 +175,7 @@ const BankAccounts = () => {
             {showBalances ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             {showBalances ? "Hide" : "Show"} Balances
           </Button>
-          <Dialog>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-primary text-primary-foreground hover:scale-105 shadow-elegant">
                 <Plus className="h-4 w-4 mr-2" />
@@ -124,11 +192,16 @@ const BankAccounts = () => {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="accountName">Account Name</Label>
-                  <Input id="accountName" placeholder="e.g. Chase Checking" />
+                  <Input 
+                    id="accountName" 
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Chase Checking" 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="accountType">Account Type</Label>
-                  <Select>
+                  <Select value={formData.type} onValueChange={(value) => setFormData(prev => ({ ...prev, type: value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select account type" />
                     </SelectTrigger>
@@ -142,13 +215,25 @@ const BankAccounts = () => {
                 </div>
                 <div>
                   <Label htmlFor="initialBalance">Initial Balance</Label>
-                  <Input id="initialBalance" type="number" placeholder="0.00" />
+                  <Input 
+                    id="initialBalance" 
+                    type="number" 
+                    value={formData.balance}
+                    onChange={(e) => setFormData(prev => ({ ...prev, balance: e.target.value }))}
+                    placeholder="0.00" 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="accountNumber">Account Number (last 4 digits)</Label>
-                  <Input id="accountNumber" placeholder="1234" maxLength={4} />
+                  <Input 
+                    id="accountNumber" 
+                    value={formData.accountNumber}
+                    onChange={(e) => setFormData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                    placeholder="1234" 
+                    maxLength={4} 
+                  />
                 </div>
-                <Button className="w-full">Add Account</Button>
+                <Button onClick={handleAddAccount} className="w-full">Add Account</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -200,9 +285,14 @@ const BankAccounts = () => {
                       <CardDescription className="capitalize">{account.type}</CardDescription>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => handleToggleAccountStatus(account.id)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDeleteAccount(account.id)} className="text-destructive hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>

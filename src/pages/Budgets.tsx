@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Plus, 
   PieChart, 
@@ -20,7 +21,9 @@ import {
   Utensils,
   Coffee,
   Heart,
-  MoreHorizontal
+  MoreHorizontal,
+  Edit,
+  Trash2
 } from "lucide-react";
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -93,6 +96,15 @@ const Budgets = () => {
     }
   ]);
 
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    budget: "",
+    category: ""
+  });
+
+  const { toast } = useToast();
+
   const totalBudgeted = categories.reduce((sum, cat) => sum + cat.budgeted, 0);
   const totalSpent = categories.reduce((sum, cat) => sum + cat.spent, 0);
   const totalRemaining = totalBudgeted - totalSpent;
@@ -123,6 +135,82 @@ const Budgets = () => {
     return "bg-primary";
   };
 
+  const categoryIconMap: Record<string, any> = {
+    "Food & Dining": Utensils,
+    "Transportation": Car,
+    "Shopping": ShoppingCart,
+    "Bills & Utilities": Home,
+    "Entertainment": Coffee,
+    "Health & Fitness": Heart
+  };
+
+  const categoryColorMap: Record<string, string> = {
+    "Food & Dining": "hsl(var(--accent))",
+    "Transportation": "hsl(var(--primary))",
+    "Shopping": "hsl(var(--warning))",
+    "Bills & Utilities": "hsl(var(--destructive))",
+    "Entertainment": "hsl(var(--success))",
+    "Health & Fitness": "hsl(190 60% 50%)"
+  };
+
+  const handleAddCategory = () => {
+    if (!formData.name || !formData.budget || !formData.category) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newCategory: BudgetCategory = {
+      id: Date.now().toString(),
+      name: formData.name,
+      icon: categoryIconMap[formData.category] || DollarSign,
+      color: categoryColorMap[formData.category] || "hsl(var(--muted))",
+      budgeted: parseFloat(formData.budget),
+      spent: 0,
+      transactions: 0
+    };
+
+    setCategories(prev => [...prev, newCategory]);
+    setFormData({ name: "", budget: "", category: "" });
+    setIsAddDialogOpen(false);
+    
+    toast({
+      title: "Success",
+      description: `${formData.name} category has been added to your budget.`
+    });
+  };
+
+  const handleDeleteCategory = (categoryId: string) => {
+    const category = categories.find(c => c.id === categoryId);
+    setCategories(prev => prev.filter(c => c.id !== categoryId));
+    
+    toast({
+      title: "Category Deleted",
+      description: `${category?.name} has been removed from your budget.`
+    });
+  };
+
+  const handleAddTransaction = (categoryId: string, amount: number) => {
+    setCategories(prev => prev.map(category => 
+      category.id === categoryId 
+        ? { 
+            ...category, 
+            spent: category.spent + amount,
+            transactions: category.transactions + 1
+          }
+        : category
+    ));
+
+    const category = categories.find(c => c.id === categoryId);
+    toast({
+      title: "Transaction Added",
+      description: `$${amount} added to ${category?.name}.`
+    });
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -132,7 +220,7 @@ const Budgets = () => {
           <p className="text-muted-foreground mt-1">Track spending across categories and stay on budget</p>
         </div>
         <div className="flex items-center gap-4">
-          <Dialog>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-primary text-primary-foreground hover:scale-105 shadow-elegant">
                 <Plus className="h-4 w-4 mr-2" />
@@ -149,29 +237,40 @@ const Budgets = () => {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="categoryName">Category Name</Label>
-                  <Input id="categoryName" placeholder="e.g. Groceries" />
+                  <Input 
+                    id="categoryName" 
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g. Groceries" 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="monthlyBudget">Monthly Budget</Label>
-                  <Input id="monthlyBudget" type="number" placeholder="500" />
+                  <Input 
+                    id="monthlyBudget" 
+                    type="number" 
+                    value={formData.budget}
+                    onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                    placeholder="500" 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="categoryIcon">Category</Label>
-                  <Select>
+                  <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="food">Food & Dining</SelectItem>
-                      <SelectItem value="transportation">Transportation</SelectItem>
-                      <SelectItem value="shopping">Shopping</SelectItem>
-                      <SelectItem value="bills">Bills & Utilities</SelectItem>
-                      <SelectItem value="entertainment">Entertainment</SelectItem>
-                      <SelectItem value="health">Health & Fitness</SelectItem>
+                      <SelectItem value="Food & Dining">Food & Dining</SelectItem>
+                      <SelectItem value="Transportation">Transportation</SelectItem>
+                      <SelectItem value="Shopping">Shopping</SelectItem>
+                      <SelectItem value="Bills & Utilities">Bills & Utilities</SelectItem>
+                      <SelectItem value="Entertainment">Entertainment</SelectItem>
+                      <SelectItem value="Health & Fitness">Health & Fitness</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <Button className="w-full">Add Category</Button>
+                <Button onClick={handleAddCategory} className="w-full">Add Category</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -321,9 +420,14 @@ const Budgets = () => {
                         <CardDescription>{category.transactions} transactions</CardDescription>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleAddTransaction(category.id, 50)}>
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category.id)} className="text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -356,11 +460,11 @@ const Budgets = () => {
                   </div>
 
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1">
-                      Add Transaction
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleAddTransaction(category.id, 25)}>
+                      Add $25
                     </Button>
-                    <Button variant="outline" size="sm" className="flex-1">
-                      View History
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleAddTransaction(category.id, 100)}>
+                      Add $100
                     </Button>
                   </div>
                 </CardContent>
