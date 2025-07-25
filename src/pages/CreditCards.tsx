@@ -23,7 +23,9 @@ import {
   EyeOff,
   Edit,
   Trash2,
-  LogIn
+  LogIn,
+  RotateCcw,
+  Archive
 } from "lucide-react";
 
 interface CreditCardData extends FirebaseDocument {
@@ -50,6 +52,7 @@ const CreditCards = () => {
   const [showBalances, setShowBalances] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     issuer: "",
@@ -78,6 +81,42 @@ const CreditCards = () => {
 
   const activeCards = cards.filter(card => card.isActive);
   const inactiveCards = cards.filter(card => !card.isActive);
+
+  const handleDeactivateCard = async (cardId: string) => {
+    try {
+      await updateDocument(cardId, { 
+        isActive: false
+      });
+      toast({
+        title: "Card Deactivated",
+        description: "Credit card has been deactivated. You can restore it anytime."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRestoreCard = async (cardId: string) => {
+    try {
+      await updateDocument(cardId, { 
+        isActive: true
+      });
+      toast({
+        title: "Card Restored",
+        description: "Credit card has been reactivated successfully."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
   const totalBalance = activeCards.reduce((sum, card) => {
     const currentBalance = calculateAccountBalance(card.id, 'credit', card.initialBalance);
     return sum + currentBalance;
@@ -167,6 +206,13 @@ const CreditCards = () => {
           <p className="text-muted-foreground mt-1">Track credit cards, balances, and rewards</p>
         </div>
         <div className="flex items-center gap-4">
+          <Button
+            variant="outline" 
+            onClick={() => setShowInactive(!showInactive)}
+          >
+            <Archive className="h-4 w-4 mr-2" />
+            {showInactive ? 'Hide' : 'Show'} Inactive ({inactiveCards.length})
+          </Button>
           <Button
             variant="outline"
             onClick={() => setShowBalances(!showBalances)}
@@ -324,11 +370,8 @@ const CreditCards = () => {
                       </div>
                     </div>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleToggleCardStatus(card.id)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteCard(card.id)} className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
+                      <Button variant="ghost" size="sm" onClick={() => handleDeactivateCard(card.id)}>
+                        <Archive className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -414,7 +457,7 @@ const CreditCards = () => {
       </div>
 
       {/* Inactive Cards */}
-      {inactiveCards.length > 0 && (
+      {showInactive && inactiveCards.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold text-foreground mb-4">Inactive Cards</h2>
           <div className="space-y-3">
@@ -431,11 +474,22 @@ const CreditCards = () => {
                         <p className="text-sm text-muted-foreground">{card.issuer} • {card.type}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <Badge variant="secondary">Inactive</Badge>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Limit: ${card.limit.toLocaleString()}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <Badge variant="secondary">Inactive</Badge>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Limit: ${card.limit.toLocaleString()}
+                        </p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleRestoreCard(card.id)}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Restore
+                      </Button>
                     </div>
                   </div>
                 </CardContent>

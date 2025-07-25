@@ -20,7 +20,9 @@ import {
   EyeOff,
   MoreHorizontal,
   Edit,
-  Trash2
+  Trash2,
+  RotateCcw,
+  Archive
 } from "lucide-react";
 
 interface BankAccount extends FirebaseDocument {
@@ -40,6 +42,7 @@ const BankAccounts = () => {
   const [showBalances, setShowBalances] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     type: "",
@@ -53,12 +56,52 @@ const BankAccounts = () => {
     return <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />;
   }
 
+  
   const activeAccounts = accounts.filter(account => account.isActive);
-  const closedAccounts = accounts.filter(account => !account.isActive);
+  const inactiveAccounts = accounts.filter(account => !account.isActive);
+  
   const totalBalance = activeAccounts.reduce((sum, account) => {
     const currentBalance = calculateAccountBalance(account.id, 'bank', account.initialBalance);
     return sum + currentBalance;
   }, 0);
+
+  const handleDeactivateAccount = async (accountId: string) => {
+    try {
+      await updateDocument(accountId, { 
+        isActive: false,
+        closedDate: new Date().toISOString().split('T')[0]
+      });
+      toast({
+        title: "Account Deactivated",
+        description: "Account has been deactivated. You can restore it anytime."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRestoreAccount = async (accountId: string) => {
+    try {
+      await updateDocument(accountId, { 
+        isActive: true,
+        closedDate: undefined
+      });
+      toast({
+        title: "Account Restored",
+        description: "Account has been reactivated successfully."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
 
   const getAccountTypeColor = (type: string) => {
     switch (type) {
@@ -97,20 +140,6 @@ const BankAccounts = () => {
     setIsAddDialogOpen(false);
   };
 
-  const handleDeleteAccount = async (accountId: string) => {
-    await deleteDocument(accountId);
-  };
-
-  const handleToggleAccountStatus = async (accountId: string) => {
-    const account = accounts.find(a => a.id === accountId);
-    if (account) {
-      await updateDocument(accountId, {
-        isActive: !account.isActive,
-        closedDate: !account.isActive ? undefined : new Date().toISOString().split('T')[0]
-      });
-    }
-  };
-
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -120,6 +149,13 @@ const BankAccounts = () => {
           <p className="text-muted-foreground mt-1">Manage your bank accounts and track balances</p>
         </div>
         <div className="flex items-center gap-4">
+          <Button
+            variant="outline" 
+            onClick={() => setShowInactive(!showInactive)}
+          >
+            <Archive className="h-4 w-4 mr-2" />
+            {showInactive ? 'Hide' : 'Show'} Inactive ({inactiveAccounts.length})
+          </Button>
           <Button
             variant="outline"
             onClick={() => setShowBalances(!showBalances)}
@@ -214,8 +250,8 @@ const BankAccounts = () => {
               <p className="text-2xl font-bold text-primary">{activeAccounts.length}</p>
             </div>
             <div className="text-center">
-              <p className="text-sm text-muted-foreground">Closed Accounts</p>
-              <p className="text-2xl font-bold text-muted-foreground">{closedAccounts.length}</p>
+              <p className="text-sm text-muted-foreground">Inactive Accounts</p>
+              <p className="text-2xl font-bold text-muted-foreground">{inactiveAccounts.length}</p>
             </div>
           </div>
         </CardContent>
@@ -242,11 +278,8 @@ const BankAccounts = () => {
                       </div>
                     </div>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleToggleAccountStatus(account.id)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteAccount(account.id)} className="text-destructive hover:text-destructive">
-                        <Trash2 className="h-4 w-4" />
+                      <Button variant="ghost" size="sm" onClick={() => handleDeactivateAccount(account.id)}>
+                        <Archive className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -294,12 +327,12 @@ const BankAccounts = () => {
         </div>
       </div>
 
-      {/* Closed Accounts */}
-      {closedAccounts.length > 0 && (
+      {/* Inactive Accounts */}
+      {showInactive && inactiveAccounts.length > 0 && (
         <div>
-          <h2 className="text-xl font-semibold text-foreground mb-4">Closed Accounts</h2>
+          <h2 className="text-xl font-semibold text-foreground mb-4">Inactive Accounts</h2>
           <div className="space-y-3">
-            {closedAccounts.map((account) => (
+            {inactiveAccounts.map((account) => (
               <Card key={account.id} className="shadow-card border-border/50 opacity-60">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -312,11 +345,22 @@ const BankAccounts = () => {
                         <p className="text-sm text-muted-foreground capitalize">{account.type} • {account.accountNumber}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <Badge variant="secondary">Closed</Badge>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {account.closedDate && new Date(account.closedDate).toLocaleDateString()}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <Badge variant="secondary">Inactive</Badge>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {account.closedDate && `Closed: ${new Date(account.closedDate).toLocaleDateString()}`}
+                        </p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleRestoreAccount(account.id)}
+                        className="text-green-600 hover:text-green-700"
+                      >
+                        <RotateCcw className="h-4 w-4 mr-1" />
+                        Restore
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
