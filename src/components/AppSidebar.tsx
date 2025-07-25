@@ -8,7 +8,8 @@ import {
   TrendingUp,
   Repeat,
   Settings,
-  FileText
+  FileText,
+  Receipt
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -28,6 +29,7 @@ const mainItems = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Bank Accounts", url: "/accounts", icon: Wallet },
   { title: "Credit Cards", url: "/credit-cards", icon: CreditCard },
+  { title: "Transactions", url: "/transactions", icon: Receipt },
   { title: "Budgets", url: "/budgets", icon: PieChart },
 ];
 

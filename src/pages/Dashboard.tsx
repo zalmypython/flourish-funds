@@ -55,6 +55,7 @@ const Dashboard = () => {
   const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
   const { documents: budgetCategories } = useFirestore<BudgetCategory>('budgetCategories');
   const { documents: savingsGoals } = useFirestore<SavingsGoal>('savingsGoals');
+  const { documents: transactions } = useFirestore<any>('transactions');
   
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showBalances, setShowBalances] = useState(true);
@@ -63,12 +64,24 @@ const Dashboard = () => {
     return <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />;
   }
 
-  // Calculate totals
+  // Calculate real balances from transactions
   const activeAccounts = bankAccounts.filter(acc => acc.isActive);
-  const totalBankBalance = activeAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+  const accountBalances = activeAccounts.map(account => {
+    const accountTransactions = transactions.filter(t => t.accountId === account.id && t.accountType === 'bank');
+    const transactionTotal = accountTransactions.reduce((sum, t) => {
+      return sum + (t.type === 'income' ? t.amount : -t.amount);
+    }, 0);
+    return account.balance + transactionTotal;
+  });
+  const totalBankBalance = accountBalances.reduce((sum, balance) => sum + balance, 0);
   
   const activeCards = creditCards.filter(card => card.isActive);
-  const totalCreditUsed = activeCards.reduce((sum, card) => sum + card.balance, 0);
+  const cardBalances = activeCards.map(card => {
+    const cardTransactions = transactions.filter(t => t.accountId === card.id && t.accountType === 'credit');
+    const transactionTotal = cardTransactions.reduce((sum, t) => sum + t.amount, 0);
+    return card.balance + transactionTotal;
+  });
+  const totalCreditUsed = cardBalances.reduce((sum, balance) => sum + balance, 0);
   const totalCreditLimit = activeCards.reduce((sum, card) => sum + card.creditLimit, 0);
   const creditUtilization = totalCreditLimit > 0 ? (totalCreditUsed / totalCreditLimit) * 100 : 0;
 
@@ -92,10 +105,24 @@ const Dashboard = () => {
     { month: 'May', value: netWorth },
   ];
 
-  const spendingData = budgetCategories.slice(0, 5).map(cat => ({
-    name: cat.name,
-    value: cat.spent,
-    color: cat.color
+  // Calculate spending from actual transactions
+  const thisMonthTransactions = transactions.filter(t => {
+    const transactionDate = new Date(t.date);
+    const now = new Date();
+    return transactionDate.getMonth() === now.getMonth() && 
+           transactionDate.getFullYear() === now.getFullYear() &&
+           t.type === 'expense';
+  });
+  
+  const spendingByCategory = thisMonthTransactions.reduce((acc, transaction) => {
+    acc[transaction.category] = (acc[transaction.category] || 0) + transaction.amount;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const spendingData = Object.entries(spendingByCategory).slice(0, 5).map(([category, amount]) => ({
+    name: category.charAt(0).toUpperCase() + category.slice(1),
+    value: amount,
+    color: `hsl(${Math.random() * 360}, 70%, 50%)`
   }));
 
   const chartConfig = {

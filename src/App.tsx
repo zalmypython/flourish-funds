@@ -13,6 +13,7 @@ import NetWorth from "./pages/NetWorth";
 import RecurringPayments from "./pages/RecurringPayments";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import { Transactions } from "./pages/Transactions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/budgets" element={<Budgets />} />
             <Route path="/goals" element={<SavingsGoals />} />
             <Route path="/net-worth" element={<NetWorth />} />
+            <Route path="/transactions" element={<Transactions />} />
             <Route path="/recurring" element={<RecurringPayments />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
