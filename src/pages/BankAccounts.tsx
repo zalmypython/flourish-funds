@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useFirestore, FirebaseDocument } from "@/hooks/useFirestore";
+import { useAuth } from "@/hooks/useAuth";
+import { AuthModal } from "@/components/AuthModal";
 import { 
   Plus, 
   Wallet, 
@@ -19,8 +22,7 @@ import {
   Trash2
 } from "lucide-react";
 
-interface BankAccount {
-  id: string;
+interface BankAccount extends FirebaseDocument {
   name: string;
   type: string;
   balance: number;
@@ -31,48 +33,11 @@ interface BankAccount {
 }
 
 const BankAccounts = () => {
-  const [accounts, setAccounts] = useState<BankAccount[]>([
-    {
-      id: "1",
-      name: "Chase Checking",
-      type: "checking",
-      balance: 4250.75,
-      accountNumber: "****1234",
-      isActive: true,
-      createdDate: "2023-01-15"
-    },
-    {
-      id: "2", 
-      name: "High Yield Savings",
-      type: "savings",
-      balance: 15750.00,
-      accountNumber: "****5678",
-      isActive: true,
-      createdDate: "2023-03-20"
-    },
-    {
-      id: "3",
-      name: "Investment Account",
-      type: "investment",
-      balance: 8500.25,
-      accountNumber: "****9012",
-      isActive: true,
-      createdDate: "2023-06-10"
-    },
-    {
-      id: "4",
-      name: "Old Checking",
-      type: "checking",
-      balance: 0,
-      accountNumber: "****3456",
-      isActive: false,
-      createdDate: "2022-01-01",
-      closedDate: "2023-12-31"
-    }
-  ]);
-
+  const { user } = useAuth();
+  const { documents: accounts, loading, addDocument, updateDocument, deleteDocument } = useFirestore<BankAccount>('bankAccounts');
   const [showBalances, setShowBalances] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     type: "",
@@ -81,6 +46,10 @@ const BankAccounts = () => {
   });
 
   const { toast } = useToast();
+
+  if (!user) {
+    return <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />;
+  }
 
   const activeAccounts = accounts.filter(account => account.isActive);
   const closedAccounts = accounts.filter(account => !account.isActive);
@@ -100,7 +69,7 @@ const BankAccounts = () => {
     return <Wallet className="h-4 w-4" />;
   };
 
-  const handleAddAccount = () => {
+  const handleAddAccount = async () => {
     if (!formData.name || !formData.type || !formData.balance || !formData.accountNumber) {
       toast({
         title: "Error",
@@ -110,52 +79,31 @@ const BankAccounts = () => {
       return;
     }
 
-    const newAccount: BankAccount = {
-      id: Date.now().toString(),
+    await addDocument({
       name: formData.name,
       type: formData.type,
       balance: parseFloat(formData.balance),
       accountNumber: `****${formData.accountNumber}`,
       isActive: true,
       createdDate: new Date().toISOString().split('T')[0]
-    };
+    });
 
-    setAccounts(prev => [...prev, newAccount]);
     setFormData({ name: "", type: "", balance: "", accountNumber: "" });
     setIsAddDialogOpen(false);
-    
-    toast({
-      title: "Success",
-      description: `${formData.name} has been added to your accounts.`
-    });
   };
 
-  const handleDeleteAccount = (accountId: string) => {
-    const account = accounts.find(a => a.id === accountId);
-    setAccounts(prev => prev.filter(a => a.id !== accountId));
-    
-    toast({
-      title: "Account Deleted",
-      description: `${account?.name} has been removed from your accounts.`
-    });
+  const handleDeleteAccount = async (accountId: string) => {
+    await deleteDocument(accountId);
   };
 
-  const handleToggleAccountStatus = (accountId: string) => {
-    setAccounts(prev => prev.map(account => 
-      account.id === accountId 
-        ? { 
-            ...account, 
-            isActive: !account.isActive,
-            closedDate: !account.isActive ? undefined : new Date().toISOString().split('T')[0]
-          }
-        : account
-    ));
-
+  const handleToggleAccountStatus = async (accountId: string) => {
     const account = accounts.find(a => a.id === accountId);
-    toast({
-      title: account?.isActive ? "Account Closed" : "Account Reopened",
-      description: `${account?.name} has been ${account?.isActive ? 'closed' : 'reopened'}.`
-    });
+    if (account) {
+      await updateDocument(accountId, {
+        isActive: !account.isActive,
+        closedDate: !account.isActive ? undefined : new Date().toISOString().split('T')[0]
+      });
+    }
   };
 
   return (

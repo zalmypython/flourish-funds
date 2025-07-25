@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useFirestore, FirebaseDocument } from "@/hooks/useFirestore";
+import { useAuth } from "@/hooks/useAuth";
+import { AuthModal } from "@/components/AuthModal";
 import { 
   Plus, 
   PieChart, 
@@ -28,10 +31,9 @@ import {
 import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
-interface BudgetCategory {
-  id: string;
+interface BudgetCategory extends FirebaseDocument {
   name: string;
-  icon: any;
+  icon: string;
   color: string;
   budgeted: number;
   spent: number;
@@ -39,64 +41,10 @@ interface BudgetCategory {
 }
 
 const Budgets = () => {
-  const [categories, setCategories] = useState<BudgetCategory[]>([
-    {
-      id: "1",
-      name: "Food & Dining",
-      icon: Utensils,
-      color: "hsl(var(--accent))",
-      budgeted: 800,
-      spent: 650,
-      transactions: 24
-    },
-    {
-      id: "2", 
-      name: "Transportation",
-      icon: Car,
-      color: "hsl(var(--primary))",
-      budgeted: 500,
-      spent: 425,
-      transactions: 8
-    },
-    {
-      id: "3",
-      name: "Shopping",
-      icon: ShoppingCart,
-      color: "hsl(var(--warning))",
-      budgeted: 600,
-      spent: 720,
-      transactions: 15
-    },
-    {
-      id: "4",
-      name: "Bills & Utilities",
-      icon: Home,
-      color: "hsl(var(--destructive))",
-      budgeted: 1200,
-      spent: 1150,
-      transactions: 6
-    },
-    {
-      id: "5",
-      name: "Entertainment",
-      icon: Coffee,
-      color: "hsl(var(--success))",
-      budgeted: 300,
-      spent: 185,
-      transactions: 12
-    },
-    {
-      id: "6",
-      name: "Health & Fitness",
-      icon: Heart,
-      color: "hsl(190 60% 50%)",
-      budgeted: 200,
-      spent: 95,
-      transactions: 4
-    }
-  ]);
-
+  const { user } = useAuth();
+  const { documents: categories, loading, addDocument, updateDocument, deleteDocument } = useFirestore<BudgetCategory>('budgetCategories');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     budget: "",
@@ -104,6 +52,10 @@ const Budgets = () => {
   });
 
   const { toast } = useToast();
+
+  if (!user) {
+    return <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />;
+  }
 
   const totalBudgeted = categories.reduce((sum, cat) => sum + cat.budgeted, 0);
   const totalSpent = categories.reduce((sum, cat) => sum + cat.spent, 0);
@@ -135,13 +87,20 @@ const Budgets = () => {
     return "bg-primary";
   };
 
-  const categoryIconMap: Record<string, any> = {
-    "Food & Dining": Utensils,
-    "Transportation": Car,
-    "Shopping": ShoppingCart,
-    "Bills & Utilities": Home,
-    "Entertainment": Coffee,
-    "Health & Fitness": Heart
+  const categoryIconMap: Record<string, string> = {
+    "Food & Dining": "Utensils",
+    "Transportation": "Car", 
+    "Shopping": "ShoppingCart",
+    "Bills & Utilities": "Home",
+    "Entertainment": "Coffee",
+    "Health & Fitness": "Heart"
+  };
+
+  const getIconComponent = (iconName: string) => {
+    const icons: Record<string, any> = {
+      Utensils, Car, ShoppingCart, Home, Coffee, Heart, DollarSign
+    };
+    return icons[iconName] || DollarSign;
   };
 
   const categoryColorMap: Record<string, string> = {
@@ -153,7 +112,7 @@ const Budgets = () => {
     "Health & Fitness": "hsl(190 60% 50%)"
   };
 
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     if (!formData.name || !formData.budget || !formData.category) {
       toast({
         title: "Error",
@@ -163,52 +122,31 @@ const Budgets = () => {
       return;
     }
 
-    const newCategory: BudgetCategory = {
-      id: Date.now().toString(),
+    await addDocument({
       name: formData.name,
-      icon: categoryIconMap[formData.category] || DollarSign,
+      icon: categoryIconMap[formData.category] || "DollarSign",
       color: categoryColorMap[formData.category] || "hsl(var(--muted))",
       budgeted: parseFloat(formData.budget),
       spent: 0,
       transactions: 0
-    };
+    });
 
-    setCategories(prev => [...prev, newCategory]);
     setFormData({ name: "", budget: "", category: "" });
     setIsAddDialogOpen(false);
-    
-    toast({
-      title: "Success",
-      description: `${formData.name} category has been added to your budget.`
-    });
   };
 
-  const handleDeleteCategory = (categoryId: string) => {
-    const category = categories.find(c => c.id === categoryId);
-    setCategories(prev => prev.filter(c => c.id !== categoryId));
-    
-    toast({
-      title: "Category Deleted",
-      description: `${category?.name} has been removed from your budget.`
-    });
+  const handleDeleteCategory = async (categoryId: string) => {
+    await deleteDocument(categoryId);
   };
 
-  const handleAddTransaction = (categoryId: string, amount: number) => {
-    setCategories(prev => prev.map(category => 
-      category.id === categoryId 
-        ? { 
-            ...category, 
-            spent: category.spent + amount,
-            transactions: category.transactions + 1
-          }
-        : category
-    ));
-
+  const handleAddTransaction = async (categoryId: string, amount: number) => {
     const category = categories.find(c => c.id === categoryId);
-    toast({
-      title: "Transaction Added",
-      description: `$${amount} added to ${category?.name}.`
-    });
+    if (category) {
+      await updateDocument(categoryId, {
+        spent: category.spent + amount,
+        transactions: category.transactions + 1
+      });
+    }
   };
 
   return (
@@ -413,7 +351,10 @@ const Budgets = () => {
                         className="p-2 rounded-lg text-white"
                         style={{ backgroundColor: category.color }}
                       >
-                        <category.icon className="h-4 w-4" />
+                        {(() => {
+                          const IconComponent = getIconComponent(category.icon);
+                          return <IconComponent className="h-4 w-4" />;
+                        })()}
                       </div>
                       <div>
                         <CardTitle className="text-base">{category.name}</CardTitle>
