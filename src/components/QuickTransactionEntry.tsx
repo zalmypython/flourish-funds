@@ -1,0 +1,221 @@
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { useFirestore } from '@/hooks/useFirestore';
+import { useAccountBalance } from '@/hooks/useAccountBalance';
+import { Transaction, BankAccount, CreditCard, DEFAULT_CATEGORIES } from '@/types';
+import { Zap, Plus, Clock } from 'lucide-react';
+
+interface QuickTransactionEntryProps {
+  accountId?: string;
+  accountType?: 'bank' | 'credit';
+}
+
+export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransactionEntryProps) => {
+  const { documents: bankAccounts } = useFirestore<BankAccount>('bankAccounts');
+  const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
+  const { addDocument: addTransaction } = useFirestore<Transaction>('transactions');
+  const { getSuggestedTransactions } = useAccountBalance();
+
+  const [formData, setFormData] = useState({
+    amount: '',
+    description: '',
+    category: '',
+    accountId: accountId || '',
+    accountType: accountType || 'bank' as 'bank' | 'credit',
+    type: 'expense' as 'income' | 'expense'
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const suggestedTransactions = accountId && accountType 
+    ? getSuggestedTransactions(accountId, accountType)
+    : [];
+
+  const handleQuickAdd = async () => {
+    if (!formData.amount || !formData.description || !formData.accountId) return;
+
+    setIsSubmitting(true);
+    try {
+      await addTransaction({
+        date: new Date().toISOString().split('T')[0],
+        amount: parseFloat(formData.amount),
+        description: formData.description,
+        category: formData.category || 'other',
+        accountId: formData.accountId,
+        accountType: formData.accountType,
+        type: formData.type,
+        status: 'cleared'
+      });
+
+      // Reset form
+      setFormData({
+        amount: '',
+        description: '',
+        category: '',
+        accountId: accountId || '',
+        accountType: accountType || 'bank',
+        type: 'expense'
+      });
+    } catch (error) {
+      console.error('Failed to add transaction:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSuggestedTransaction = (transaction: Transaction) => {
+    setFormData({
+      amount: transaction.amount.toString(),
+      description: transaction.description,
+      category: transaction.category,
+      accountId: formData.accountId,
+      accountType: formData.accountType,
+      type: transaction.type === 'transfer' || transaction.type === 'payment' ? 'expense' : transaction.type
+    });
+  };
+
+  const getAccountOptions = () => {
+    if (accountId && accountType) return []; // Fixed account mode
+    
+    return [
+      ...bankAccounts.map(acc => ({ ...acc, type: 'bank' as const })),
+      ...creditCards.map(card => ({ ...card, type: 'credit' as const }))
+    ];
+  };
+
+  return (
+    <Card className="shadow-card">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Zap className="h-5 w-5" />
+          Quick Transaction
+        </CardTitle>
+        <CardDescription>
+          Add a transaction quickly with smart suggestions
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Suggested Transactions */}
+        {suggestedTransactions.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              Recent Transactions
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {suggestedTransactions.slice(0, 3).map((transaction) => (
+                <Button
+                  key={transaction.id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleSuggestedTransaction(transaction)}
+                  className="h-auto p-2 flex flex-col items-start"
+                >
+                  <span className="font-medium">{transaction.description}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">
+                      ${transaction.amount}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      {DEFAULT_CATEGORIES.find(c => c.id === transaction.category)?.name}
+                    </Badge>
+                  </div>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Entry Form */}
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            placeholder="Amount"
+            type="number"
+            step="0.01"
+            value={formData.amount}
+            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+          />
+          <Input
+            placeholder="Description"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="income">Income</SelectItem>
+              <SelectItem value="expense">Expense</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              {DEFAULT_CATEGORIES.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Account Selection (only if not fixed) */}
+        {!accountId && (
+          <div className="grid grid-cols-2 gap-3">
+            <Select 
+              value={formData.accountType} 
+              onValueChange={(value: 'bank' | 'credit') => 
+                setFormData({ ...formData, accountType: value, accountId: '' })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bank">Bank Account</SelectItem>
+                <SelectItem value="credit">Credit Card</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select 
+              value={formData.accountId} 
+              onValueChange={(value) => setFormData({ ...formData, accountId: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {(formData.accountType === 'bank' ? bankAccounts : creditCards).map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        <Button 
+          onClick={handleQuickAdd}
+          disabled={!formData.amount || !formData.description || !formData.accountId || isSubmitting}
+          className="w-full"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          {isSubmitting ? 'Adding...' : 'Add Transaction'}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+};

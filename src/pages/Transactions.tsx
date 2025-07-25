@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useFirestore, FirebaseDocument } from '@/hooks/useFirestore';
-import { Transaction, DEFAULT_CATEGORIES } from '@/types';
+import { useFirestore } from '@/hooks/useFirestore';
+import { Transaction, DEFAULT_CATEGORIES, BankAccount, CreditCard } from '@/types';
 import { AuthModal } from '@/components/AuthModal';
+import { TransferModal } from '@/components/TransferModal';
+import { QuickTransactionEntry } from '@/components/QuickTransactionEntry';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,24 +14,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Search, Filter, Calendar, DollarSign, ArrowUpDown, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, Filter, Calendar, DollarSign, ArrowUpDown, Eye, EyeOff, ArrowRightLeft, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 
-interface BankAccount extends FirebaseDocument {
-  name: string;
-  type: string;
-  balance: number;
-  accountNumber: string;
-  isActive: boolean;
-}
-
-interface CreditCard extends FirebaseDocument {
-  name: string;
-  issuer: string;
-  limit: number;
-  balance: number;
-  isActive: boolean;
-}
 
 export const Transactions = () => {
   const { user } = useAuth();
@@ -39,6 +26,7 @@ export const Transactions = () => {
   
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [showAmounts, setShowAmounts] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -159,6 +147,13 @@ export const Transactions = () => {
             onClick={() => setShowAmounts(!showAmounts)}
           >
             {showAmounts ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsTransferModalOpen(true)}
+          >
+            <ArrowRightLeft className="h-4 w-4 mr-2" />
+            Transfer
           </Button>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
@@ -295,6 +290,22 @@ export const Transactions = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        </div>
+      </div>
+
+      {/* Transfer Modal */}
+      <TransferModal 
+        open={isTransferModalOpen} 
+        onOpenChange={setIsTransferModalOpen} 
+      />
+
+      {/* Quick Transaction Entry */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <QuickTransactionEntry />
+        </div>
+        <div className="lg:col-span-1">
+          {/* Additional quick actions can go here */}
         </div>
       </div>
 

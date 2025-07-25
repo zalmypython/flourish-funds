@@ -16,6 +16,20 @@ export interface Transaction extends FirebaseDocument {
   status: 'pending' | 'cleared' | 'reconciled';
   merchantName?: string;
   location?: string;
+  // Enhanced transfer tracking
+  transferToAccountId?: string;
+  transferToAccountType?: 'bank' | 'credit';
+  transferFromAccountId?: string;
+  transferFromAccountType?: 'bank' | 'credit';
+  // Payment tracking
+  paymentToAccountId?: string;
+  paymentFromAccountId?: string;
+  // Receipt and location data
+  receiptUrl?: string;
+  gpsLocation?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 export interface TransactionCategory {
