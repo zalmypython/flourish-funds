@@ -77,7 +77,8 @@ export const CreditCardBonusManager = ({ cardId, bonuses, onBonusUpdate }: Credi
       status: 'not_started',
       category: formData.category || undefined,
       categoryMultiplier: formData.categoryMultiplier ? parseFloat(formData.categoryMultiplier) : undefined,
-      notes: formData.notes || undefined
+      notes: formData.notes || undefined,
+      rewardType: 'cashback'
     };
 
     try {

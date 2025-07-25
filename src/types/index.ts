@@ -91,6 +91,15 @@ export interface BankAccount extends FirebaseDocument {
   lastBalanceUpdate: string;
 }
 
+export interface RewardRedemption {
+  id: string;
+  date: string;
+  amount: number;
+  type: 'cashback' | 'points' | 'miles';
+  description?: string;
+  redemptionMethod?: string; // e.g., "statement credit", "direct deposit", "check"
+}
+
 export interface CreditCardBonus {
   id: string;
   title: string;
@@ -109,6 +118,8 @@ export interface CreditCardBonus {
   datePaidOut?: string;
   actualValueReceived?: number;
   notes?: string;
+  rewardType: 'cashback' | 'points' | 'miles';
+  actualRewardAmount?: number;
 }
 
 export interface CreditCardGoal {
@@ -165,6 +176,11 @@ export interface CreditCard extends FirebaseDocument {
   // Cached balance for performance
   currentBalance: number;
   lastBalanceUpdate: string;
+  // Rewards and cash back tracking
+  cashBackBalance: number;
+  categoryRewards: { [category: string]: number };
+  rewardType: 'cashback' | 'points' | 'miles';
+  redemptionHistory: RewardRedemption[];
 }
 
 export const DEFAULT_CATEGORIES: TransactionCategory[] = [

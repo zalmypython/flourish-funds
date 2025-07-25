@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { SmartBudgetIntegration } from '@/components/SmartBudgetIntegration';
 import { AccountGoalsManager } from '@/components/AccountGoalsManager';
 import { CreditCardBonusManager } from '@/components/CreditCardBonusManager';
+import CashBackManager from '@/components/CashBackManager';
 import { CreditCard, Transaction, CreditCardGoal, CreditCardBonus } from '@/types';
 import { ArrowLeft, CreditCard as CreditCardIcon, AlertTriangle, Calendar, Target, Gift, Plus, Edit, Percent, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
@@ -18,7 +19,7 @@ const CreditCardDetail = () => {
   const { cardId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { documents: cards } = useFirestore<CreditCard>('creditCards');
+  const { documents: cards, updateDocument } = useFirestore<CreditCard>('creditCards');
   const { documents: transactions } = useFirestore<Transaction>('transactions');
   const { calculateAccountBalance, getAccountTransactionSummary } = useAccountBalance();
 
@@ -60,6 +61,10 @@ const CreditCardDetail = () => {
 
   const getBonusProgress = (bonus: CreditCardBonus) => {
     return Math.min((bonus.currentSpending / bonus.spendingRequired) * 100, 100);
+  };
+
+  const handleCardUpdate = (updatedCard: CreditCard) => {
+    updateDocument(updatedCard.id, updatedCard);
   };
 
   return (
@@ -164,6 +169,12 @@ const CreditCardDetail = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Cash Back/Rewards Tracking */}
+      <CashBackManager 
+        card={card}
+        onCardUpdate={handleCardUpdate}
+      />
 
       {/* Enhanced Bonus Management */}
       <CreditCardBonusManager 

@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { CreditCard } from '@/types';
+import { CreditCard, DEFAULT_CATEGORIES } from '@/types';
 
 const MAJOR_ISSUERS = [
   'American Express',
@@ -66,7 +66,12 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
     // Churning
     eligibleForSignupBonus: editCard?.eligibleForSignupBonus !== false,
     lastSignupBonusDate: editCard?.lastSignupBonusDate || '',
-    churningNotes: editCard?.churningNotes || ''
+    churningNotes: editCard?.churningNotes || '',
+    
+    // Rewards
+    rewardType: editCard?.rewardType || 'cashback',
+    cashBackBalance: editCard?.cashBackBalance?.toString() || '0',
+    categoryRewards: editCard?.categoryRewards || {}
   });
 
   const resetForm = () => {
@@ -88,7 +93,10 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
       dueDate: '',
       eligibleForSignupBonus: true,
       lastSignupBonusDate: '',
-      churningNotes: ''
+      churningNotes: '',
+      rewardType: 'cashback',
+      cashBackBalance: '0',
+      categoryRewards: {}
     });
     setCurrentTab('basic');
   };
@@ -138,6 +146,12 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
       accountStatus: 'active' as const,
       isActive: true,
       
+      // Rewards tracking
+      rewardType: formData.rewardType as 'cashback' | 'points' | 'miles',
+      cashBackBalance: parseFloat(formData.cashBackBalance) || 0,
+      categoryRewards: formData.categoryRewards,
+      redemptionHistory: editCard?.redemptionHistory || [],
+      
       // Initialize with empty arrays if not editing
       bonuses: editCard?.bonuses || [],
       goals: editCard?.goals || []
@@ -163,9 +177,10 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
         </DialogHeader>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
             <TabsTrigger value="financial">Financial</TabsTrigger>
+            <TabsTrigger value="rewards">Rewards</TabsTrigger>
             <TabsTrigger value="dates">Dates</TabsTrigger>
             <TabsTrigger value="churning">Churning</TabsTrigger>
           </TabsList>
@@ -297,6 +312,66 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
                   onCheckedChange={(checked) => setFormData(prev => ({ ...prev, annualFeeWaivedFirstYear: checked }))}
                 />
                 <Label htmlFor="annualFeeWaivedFirstYear">First year annual fee waived</Label>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="rewards" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="rewardType">Reward Type</Label>
+                <Select value={formData.rewardType} onValueChange={(value: 'cashback' | 'points' | 'miles') => setFormData(prev => ({ ...prev, rewardType: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select reward type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cashback">Cash Back</SelectItem>
+                    <SelectItem value="points">Points</SelectItem>
+                    <SelectItem value="miles">Miles</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="cashBackBalance">Current {formData.rewardType === 'cashback' ? 'Cash Back' : formData.rewardType === 'points' ? 'Points' : 'Miles'} Balance</Label>
+                <Input
+                  id="cashBackBalance"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.cashBackBalance}
+                  onChange={(e) => setFormData(prev => ({ ...prev, cashBackBalance: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label className="text-base font-medium">Category Reward Rates (%)</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                {DEFAULT_CATEGORIES.map((category) => (
+                  <div key={category.id} className="flex items-center justify-between">
+                    <Label htmlFor={`rate_${category.id}`} className="text-sm">{category.name}</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id={`rate_${category.id}`}
+                        type="number"
+                        step="0.25"
+                        min="0"
+                        max="10"
+                        className="w-20"
+                        value={formData.categoryRewards[category.id] || 1}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categoryRewards: {
+                            ...prev.categoryRewards,
+                            [category.id]: parseFloat(e.target.value) || 1
+                          }
+                        }))}
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </TabsContent>
