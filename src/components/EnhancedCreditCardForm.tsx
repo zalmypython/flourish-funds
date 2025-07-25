@@ -73,8 +73,13 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
     cashBackBalance: editCard?.cashBackBalance?.toString() || '0',
     categoryRewards: editCard?.categoryRewards || DEFAULT_CATEGORIES.reduce((acc, cat) => ({
       ...acc,
-      [cat.id]: { type: 'cashback', rate: 1, ratio: undefined }
-    }), {})
+      [cat.id]: { type: 'cashback', rate: 0, ratio: undefined }
+    }), {}),
+    // Signup bonus fields
+    signupBonusAmount: '',
+    signupSpendingRequired: '',
+    signupDeadline: '',
+    signupValue: ''
   });
 
   const resetForm = () => {
@@ -101,8 +106,12 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
       cashBackBalance: '0',
       categoryRewards: DEFAULT_CATEGORIES.reduce((acc, cat) => ({
         ...acc,
-        [cat.id]: { type: 'cashback', rate: 1, ratio: undefined }
-      }), {})
+        [cat.id]: { type: 'cashback', rate: 0, ratio: undefined }
+      }), {}),
+      signupBonusAmount: '',
+      signupSpendingRequired: '',
+      signupDeadline: '',
+      signupValue: ''
     });
     setCurrentTab('basic');
   };
@@ -184,10 +193,11 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
         </DialogHeader>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
             <TabsTrigger value="financial">Financial</TabsTrigger>
             <TabsTrigger value="rewards">Rewards</TabsTrigger>
+            <TabsTrigger value="signup">Signup Bonus</TabsTrigger>
             <TabsTrigger value="dates">Dates</TabsTrigger>
             <TabsTrigger value="churning">Churning</TabsTrigger>
           </TabsList>
@@ -344,7 +354,7 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
                   id="cashBackBalance"
                   type="number"
                   step="0.01"
-                  min="0"
+                            min="0"
                   value={formData.cashBackBalance}
                   onChange={(e) => setFormData(prev => ({ ...prev, cashBackBalance: e.target.value }))}
                   placeholder="0.00"
@@ -399,7 +409,7 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
                                 ...prev.categoryRewards,
                                 [category.id]: { 
                                   ...categoryReward, 
-                                  rate: parseFloat(e.target.value) || 1 
+                                  rate: parseFloat(e.target.value) || 0 
                                 }
                               }
                             }))}
@@ -429,6 +439,63 @@ export const EnhancedCreditCardForm = ({ open, onOpenChange, onSubmit, editCard 
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="signup" className="space-y-4">
+            <div className="space-y-4">
+              <div>
+                <Label className="text-base font-medium">Signup Bonus Configuration</Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Configure the signup bonus for this card
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="signupBonusAmount">Bonus Amount</Label>
+                  <Input 
+                    id="signupBonusAmount" 
+                    placeholder="e.g., 80,000 points, $500 cash back"
+                    value={formData.signupBonusAmount || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, signupBonusAmount: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="signupSpendingRequired">Spending Required ($)</Label>
+                  <Input 
+                    id="signupSpendingRequired" 
+                    type="number"
+                    placeholder="4000"
+                    value={formData.signupSpendingRequired || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, signupSpendingRequired: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="signupDeadline">Deadline (months from approval)</Label>
+                  <Input 
+                    id="signupDeadline" 
+                    type="number"
+                    placeholder="3"
+                    value={formData.signupDeadline || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, signupDeadline: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="signupValue">Estimated Value ($)</Label>
+                  <Input 
+                    id="signupValue" 
+                    type="number"
+                    step="0.01"
+                    placeholder="800"
+                    value={formData.signupValue || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, signupValue: e.target.value }))}
+                  />
+                </div>
               </div>
             </div>
           </TabsContent>
