@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useFirestore, FirebaseDocument } from '@/hooks/useFirestore';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
+import { useToast } from '@/hooks/use-toast';
 import { Transaction, DEFAULT_CATEGORIES, BankAccount, CreditCard } from '@/types';
 import { AuthModal } from '@/components/AuthModal';
 import { TransferModal } from '@/components/TransferModal';
@@ -39,6 +40,7 @@ export const Transactions = () => {
   const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
   const { documents: budgets } = useFirestore<Budget>('budgets');
   const { addTransactionWithBalanceUpdate } = useAccountBalance();
+  const { toast } = useToast();
   
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -81,43 +83,69 @@ export const Transactions = () => {
   }
 
   const handleAddTransaction = async () => {
-    if (!formData.amount || !formData.description || !formData.accountId) return;
+    if (!formData.amount || !formData.description || !formData.accountId) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // For expenses, check if budget is selected
     if (formData.type === 'expense' && !formData.budgetId) {
-      // Could add toast notification here for missing budget
+      toast({
+        title: "Budget Required",
+        description: "Please select a budget for expense transactions.",
+        variant: "destructive"
+      });
       return;
     }
 
-    // For expenses, use budget's category. For income, use 'income' category
-    const category = formData.type === 'expense' && formData.budgetId
-      ? budgets.find(b => b.id === formData.budgetId)?.category || 'other'
-      : 'income';
+    try {
+      // For expenses, use budget's category. For income, use 'income' category
+      const category = formData.type === 'expense' && formData.budgetId
+        ? budgets.find(b => b.id === formData.budgetId)?.category || 'other'
+        : formData.type === 'income' ? 'income' : 'other';
 
-    await addTransactionWithBalanceUpdate({
-      date: formData.date,
-      amount: parseFloat(formData.amount),
-      description: formData.description,
-      category,
-      accountId: formData.accountId,
-      accountType: formData.accountType,
-      type: formData.type,
-      notes: formData.notes,
-      status: formData.status
-    });
+      await addTransactionWithBalanceUpdate({
+        date: formData.date,
+        amount: parseFloat(formData.amount),
+        description: formData.description,
+        category,
+        accountId: formData.accountId,
+        accountType: formData.accountType,
+        type: formData.type,
+        notes: formData.notes,
+        status: formData.status
+      });
 
-    setFormData({
-      date: new Date().toISOString().split('T')[0],
-      amount: '',
-      description: '',
-      budgetId: '',
-      accountId: '',
-      accountType: 'bank',
-      type: 'expense',
-      notes: '',
-      status: 'cleared'
-    });
-    setIsAddDialogOpen(false);
+      setFormData({
+        date: new Date().toISOString().split('T')[0],
+        amount: '',
+        description: '',
+        budgetId: '',
+        accountId: '',
+        accountType: 'bank',
+        type: 'expense',
+        notes: '',
+        status: 'cleared'
+      });
+      
+      setIsAddDialogOpen(false);
+      
+      toast({
+        title: "Success",
+        description: "Transaction added successfully!",
+      });
+    } catch (error) {
+      console.error('Failed to add transaction:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add transaction. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const filteredTransactions = transactions.filter(transaction => {
@@ -255,17 +283,28 @@ export const Transactions = () => {
                         <SelectTrigger>
                           <SelectValue placeholder="Select Budget" />
                         </SelectTrigger>
-                        <SelectContent className="bg-background border">
-                          {activeBudgets.map((budget) => (
-                            <SelectItem key={budget.id} value={budget.id}>
-                              {budget.name}
+                        <SelectContent className="bg-background border z-50">
+                          {activeBudgets.length > 0 ? (
+                            activeBudgets.map((budget) => (
+                              <SelectItem key={budget.id} value={budget.id}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{budget.name}</span>
+                                  <Badge variant="outline" className="ml-2 text-xs">
+                                    ${budget.amount - budget.spent} left
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="" disabled>
+                              No active budgets available
                             </SelectItem>
-                          ))}
+                          )}
                         </SelectContent>
                       </Select>
                     ) : (
                       <div className="flex items-center justify-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
-                        No budget needed for income
+                        No budget needed for {formData.type}
                       </div>
                     )}
                   </div>
@@ -322,7 +361,12 @@ export const Transactions = () => {
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleAddTransaction}>Add Transaction</Button>
+                <Button 
+                  onClick={handleAddTransaction}
+                  disabled={!formData.amount || !formData.description || !formData.accountId || (formData.type === 'expense' && !formData.budgetId)}
+                >
+                  Add Transaction
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

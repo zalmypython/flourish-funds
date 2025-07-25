@@ -53,7 +53,14 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
     : [];
 
   const handleQuickAdd = async () => {
-    if (!formData.amount || !formData.description || !formData.accountId) return;
+    if (!formData.amount || !formData.description || !formData.accountId) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // For expenses, check if budget is selected
     if (formData.type === 'expense' && !formData.budgetId) {
@@ -70,7 +77,7 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
       // For expenses, use budget's category. For income, use 'income' category
       const category = formData.type === 'expense' && formData.budgetId
         ? budgets.find(b => b.id === formData.budgetId)?.category || 'other'
-        : 'income';
+        : formData.type === 'income' ? 'income' : 'other';
 
       await addTransactionWithBalanceUpdate({
         date: new Date().toISOString().split('T')[0],
@@ -212,17 +219,28 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
               <SelectTrigger>
                 <SelectValue placeholder="Select Budget" />
               </SelectTrigger>
-              <SelectContent>
-                {activeBudgets.map((budget) => (
-                  <SelectItem key={budget.id} value={budget.id}>
-                    {budget.name}
+              <SelectContent className="bg-background border z-50">
+                {activeBudgets.length > 0 ? (
+                  activeBudgets.map((budget) => (
+                    <SelectItem key={budget.id} value={budget.id}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{budget.name}</span>
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          ${budget.amount - budget.spent} left
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="" disabled>
+                    No active budgets available
                   </SelectItem>
-                ))}
+                )}
               </SelectContent>
             </Select>
           ) : (
             <div className="flex items-center justify-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
-              No budget needed for income
+              No budget needed for {formData.type}
             </div>
           )}
         </div>
@@ -265,7 +283,7 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
 
         <Button 
           onClick={handleQuickAdd}
-          disabled={!formData.amount || !formData.description || !formData.accountId || isSubmitting}
+          disabled={!formData.amount || !formData.description || !formData.accountId || isSubmitting || (formData.type === 'expense' && !formData.budgetId)}
           className="w-full"
         >
           <Plus className="h-4 w-4 mr-2" />
