@@ -45,6 +45,10 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
 
   // Get active budgets for expenses
   const activeBudgets = budgets.filter(budget => budget.status === 'active');
+  
+  // Debug logging
+  console.log('QuickEntry - All budgets:', budgets);
+  console.log('QuickEntry - Active budgets:', activeBudgets);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -234,8 +238,19 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
                 </SelectContent>
               </Select>
             ) : (
-              <div className="flex items-center justify-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
-                No active budgets available
+              <div className="space-y-3">
+                <div className="flex items-center justify-center h-10 px-3 border rounded-md bg-muted text-muted-foreground">
+                  No active budgets available
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => window.location.href = '/budgets'}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First Budget
+                </Button>
               </div>
             )
           ) : (
