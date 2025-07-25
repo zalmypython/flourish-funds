@@ -46,6 +46,9 @@ All colors MUST be HSL.
     --gradient-primary: linear-gradient(135deg, hsl(190 90% 30%), hsl(190 80% 50%));
     --gradient-secondary: linear-gradient(135deg, hsl(210 20% 98%), hsl(210 15% 96%));
     --gradient-accent: linear-gradient(135deg, hsl(32 95% 44%), hsl(32 90% 55%));
+    --gradient-success: linear-gradient(135deg, hsl(120 60% 50%), hsl(120 55% 60%));
+    --gradient-warning: linear-gradient(135deg, hsl(38 92% 50%), hsl(38 85% 60%));
+    --gradient-financial: linear-gradient(135deg, hsl(228 84% 14%), hsl(220 91% 20%));
     
     --shadow-elegant: 0 10px 30px -10px hsl(190 90% 30% / 0.15);
     --shadow-card: 0 4px 20px -4px hsl(215 25% 15% / 0.08);
@@ -108,6 +111,9 @@ All colors MUST be HSL.
     --gradient-primary: linear-gradient(135deg, hsl(190 80% 50%), hsl(190 70% 60%));
     --gradient-secondary: linear-gradient(135deg, hsl(215 30% 8%), hsl(215 25% 10%));
     --gradient-accent: linear-gradient(135deg, hsl(32 90% 55%), hsl(32 85% 65%));
+    --gradient-success: linear-gradient(135deg, hsl(120 50% 45%), hsl(120 45% 55%));
+    --gradient-warning: linear-gradient(135deg, hsl(38 85% 55%), hsl(38 80% 65%));
+    --gradient-financial: linear-gradient(135deg, hsl(228 84% 24%), hsl(220 91% 30%));
     
     --shadow-elegant: 0 10px 30px -10px hsl(0 0% 0% / 0.3);
     --shadow-card: 0 4px 20px -4px hsl(0 0% 0% / 0.2);

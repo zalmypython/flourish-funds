@@ -36,8 +36,7 @@ export const useFirestore = <T extends FirebaseDocument>(collectionName: string)
 
     const q = query(
       collection(db, collectionName),
-      where("userId", "==", user.uid),
-      orderBy("createdAt", "desc")
+      where("userId", "==", user.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -45,7 +44,18 @@ export const useFirestore = <T extends FirebaseDocument>(collectionName: string)
         id: doc.id,
         ...doc.data()
       })) as T[];
-      setDocuments(docs);
+      
+      // Sort in memory instead of requiring a Firebase composite index
+      const sortedDocs = docs.sort((a, b) => {
+        const aDate = a.createdAt?.toDate?.() || new Date(a.createdAt);
+        const bDate = b.createdAt?.toDate?.() || new Date(b.createdAt);
+        return bDate.getTime() - aDate.getTime();
+      });
+      
+      setDocuments(sortedDocs);
+      setLoading(false);
+    }, (error) => {
+      console.error('Firestore query error:', error);
       setLoading(false);
     });
 

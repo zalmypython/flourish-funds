@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
+import { useToast } from '@/hooks/use-toast';
 import { Transaction, BankAccount, CreditCard, DEFAULT_CATEGORIES } from '@/types';
 import { Zap, Plus, Clock } from 'lucide-react';
 
@@ -19,6 +20,7 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
   const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
   const { addDocument: addTransaction } = useFirestore<Transaction>('transactions');
   const { getSuggestedTransactions } = useAccountBalance();
+  const { toast } = useToast();
 
   const [formData, setFormData] = useState({
     amount: '',
@@ -60,8 +62,18 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
         accountType: accountType || 'bank',
         type: 'expense'
       });
+
+      toast({
+        title: "Success",
+        description: "Transaction added successfully!"
+      });
     } catch (error) {
       console.error('Failed to add transaction:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add transaction. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setIsSubmitting(false);
     }
