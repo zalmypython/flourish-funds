@@ -27,6 +27,111 @@ export interface TransactionCategory {
   budgetId?: string;
 }
 
+export interface AccountGoal {
+  id: string;
+  type: 'savings' | 'spending_limit' | 'balance_maintenance';
+  title: string;
+  description?: string;
+  targetAmount: number;
+  currentAmount?: number;
+  startDate: string;
+  endDate: string;
+  status: 'active' | 'completed' | 'paused' | 'expired';
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface AccountBonus {
+  id: string;
+  title: string;
+  description: string;
+  requirement: string;
+  bonusAmount: number;
+  startDate: string;
+  endDate: string;
+  status: 'active' | 'completed' | 'expired';
+  progress: number; // 0-100
+  requirementType: 'balance' | 'transactions' | 'direct_deposit' | 'spending';
+}
+
+export interface BankAccount extends FirebaseDocument {
+  name: string;
+  type: string;
+  initialBalance: number;
+  accountNumber: string;
+  isActive: boolean;
+  createdDate: string;
+  closedDate?: string;
+  // Enhanced fields
+  bankName?: string;
+  routingNumber?: string;
+  accountPurpose?: string;
+  color?: string;
+  nickname?: string;
+  notes?: string;
+  // Goal and bonus tracking
+  goals?: AccountGoal[];
+  bonuses?: AccountBonus[];
+  // Date tracking
+  lastTransactionDate?: string;
+  statementDate?: string;
+  anniversaryDate?: string;
+}
+
+export interface CreditCardBonus {
+  id: string;
+  title: string;
+  description: string;
+  requirement: string;
+  bonusAmount: string; // e.g., "80,000 points" or "$500 cash back"
+  spendingRequired: number;
+  currentSpending: number;
+  startDate: string;
+  endDate: string;
+  status: 'active' | 'completed' | 'expired';
+  category?: string; // e.g., "dining", "travel", "general"
+}
+
+export interface CreditCardGoal {
+  id: string;
+  type: 'utilization' | 'payment' | 'spending' | 'reward_earning';
+  title: string;
+  description?: string;
+  targetAmount: number;
+  currentAmount?: number;
+  startDate: string;
+  endDate: string;
+  status: 'active' | 'completed' | 'paused' | 'expired';
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface CreditCard extends FirebaseDocument {
+  name: string;
+  issuer: string;
+  type: string;
+  limit: number;
+  initialBalance: number;
+  dueDate: string;
+  interestRate: number;
+  isActive: boolean;
+  bonuses: CreditCardBonus[];
+  // Enhanced fields
+  annualFee?: number;
+  rewardRate?: number;
+  color?: string;
+  nickname?: string;
+  notes?: string;
+  statementDate?: string;
+  minimumPayment?: number;
+  paymentDueDay?: number;
+  // Goal tracking
+  goals?: CreditCardGoal[];
+  // Date tracking
+  applicationDate?: string;
+  approvalDate?: string;
+  lastPaymentDate?: string;
+  anniversaryDate?: string;
+}
+
 export const DEFAULT_CATEGORIES: TransactionCategory[] = [
   { id: 'food', name: 'Food & Dining', icon: 'UtensilsCrossed', color: '#e74c3c' },
   { id: 'transportation', name: 'Transportation', icon: 'Car', color: '#3498db' },

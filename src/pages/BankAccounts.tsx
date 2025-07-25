@@ -277,8 +277,13 @@ const BankAccounts = () => {
                         <Edit className="h-3 w-3 mr-1" />
                         Edit
                       </Button>
-                      <Button variant="outline" size="sm" className="flex-1">
-                        View Transactions
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => window.location.href = `/accounts/${account.id}`}
+                      >
+                        View Details
                       </Button>
                     </div>
                   </div>

@@ -397,8 +397,13 @@ const CreditCards = () => {
                     <Button variant="outline" size="sm" className="flex-1">
                       Make Payment
                     </Button>
-                    <Button variant="outline" size="sm" className="flex-1">
-                      View Transactions
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => window.location.href = `/credit-cards/${card.id}`}
+                    >
+                      View Details
                     </Button>
                   </div>
                 </CardContent>
