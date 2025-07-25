@@ -14,10 +14,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <div className="flex items-center gap-4">
                   <SidebarTrigger />
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center shadow-elegant">
                       <span className="text-white font-bold text-sm">F</span>
                     </div>
-                    <h1 className="text-xl font-bold text-foreground">Flourish Funds</h1>
+                    <h1 className="text-xl font-bold text-foreground bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+                      Flourish Funds
+                    </h1>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
@@ -27,7 +29,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             </header>
-            <main className="flex-1 p-6">
+            <main className="flex-1 p-6 bg-gradient-to-br from-background to-muted/20">
               {children}
             </main>
           </div>

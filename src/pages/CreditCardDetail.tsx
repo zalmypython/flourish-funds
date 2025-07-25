@@ -8,6 +8,7 @@ import { useFirestore } from '@/hooks/useFirestore';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useAuth } from '@/hooks/useAuth';
 import { SmartBudgetIntegration } from '@/components/SmartBudgetIntegration';
+import { AccountGoalsManager } from '@/components/AccountGoalsManager';
 import { CreditCard, Transaction, CreditCardGoal, CreditCardBonus } from '@/types';
 import { ArrowLeft, CreditCard as CreditCardIcon, AlertTriangle, Calendar, Target, Gift, Plus, Edit, Percent, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
@@ -259,6 +260,14 @@ const CreditCardDetail = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Account Goals Manager */}
+      <AccountGoalsManager 
+        accountId={card.id} 
+        accountType="credit" 
+        accountName={card.name}
+        currentBalance={currentBalance}
+      />
 
       {/* Smart Budget Integration */}
       <SmartBudgetIntegration accountId={card.id} accountType="credit" />

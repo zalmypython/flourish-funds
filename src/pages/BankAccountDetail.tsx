@@ -8,6 +8,7 @@ import { useFirestore } from '@/hooks/useFirestore';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useAuth } from '@/hooks/useAuth';
 import { SmartBudgetIntegration } from '@/components/SmartBudgetIntegration';
+import { AccountGoalsManager } from '@/components/AccountGoalsManager';
 import { BankAccount, Transaction, AccountGoal, AccountBonus } from '@/types';
 import { ArrowLeft, Wallet, TrendingUp, TrendingDown, Calendar, Target, Gift, Plus, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -225,6 +226,14 @@ const BankAccountDetail = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Account Goals Manager */}
+      <AccountGoalsManager 
+        accountId={account.id} 
+        accountType="bank" 
+        accountName={account.name}
+        currentBalance={currentBalance}
+      />
 
       {/* Smart Budget Integration */}
       <SmartBudgetIntegration accountId={account.id} accountType="bank" />

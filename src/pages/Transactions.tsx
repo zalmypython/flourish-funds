@@ -305,7 +305,32 @@ export const Transactions = () => {
           <QuickTransactionEntry />
         </div>
         <div className="lg:col-span-1">
-          {/* Additional quick actions can go here */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                Quick Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button 
+                onClick={() => setIsTransferModalOpen(true)}
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                Transfer Money
+              </Button>
+              <Button 
+                onClick={() => setIsAddDialogOpen(true)}
+                className="w-full justify-start"
+                variant="outline"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Transaction
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

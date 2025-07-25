@@ -363,6 +363,114 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Enhanced Features Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card className="shadow-card border-border/50">
+            <CardHeader>
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>Your latest financial activity</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {transactions.slice(0, 5).map((transaction, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${transaction.type === 'income' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                        <DollarSign className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{transaction.description}</p>
+                        <p className="text-sm text-muted-foreground">{transaction.category}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-bold ${transaction.type === 'income' ? 'text-success' : 'text-destructive'}`}>
+                        {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toLocaleString()}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(transaction.date).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {transactions.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>No recent transactions</p>
+                    <p className="text-sm">Start by adding your first transaction</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div className="space-y-6">
+          {/* Quick Stats */}
+          <Card className="shadow-card border-border/50">
+            <CardHeader>
+              <CardTitle>This Month</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Transactions</span>
+                <span className="font-bold">{thisMonthTransactions.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Top Category</span>
+                <span className="font-bold text-sm">
+                  {Object.entries(spendingByCategory)[0]?.[0]?.charAt(0).toUpperCase() + 
+                   Object.entries(spendingByCategory)[0]?.[0]?.slice(1) || 'None'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Avg Transaction</span>
+                <span className="font-bold">
+                  ${thisMonthTransactions.length > 0 
+                    ? (thisMonthTransactions.reduce((sum, t) => sum + t.amount, 0) / thisMonthTransactions.length).toFixed(0)
+                    : '0'}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Progress Card */}
+          <Card className="shadow-card border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                Goals Progress
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {savingsGoals.slice(0, 3).map((goal, index) => {
+                const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
+                return (
+                  <div key={index} className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium">{goal.name}</span>
+                      <span>{progress.toFixed(0)}%</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2">
+                      <div 
+                        className="bg-primary h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(progress, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              {savingsGoals.length === 0 && (
+                <div className="text-center py-4 text-muted-foreground">
+                  <Target className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No active goals</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
