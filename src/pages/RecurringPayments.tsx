@@ -19,9 +19,11 @@ import {
   CheckCircle,
   Clock
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useFirestore, FirebaseDocument } from "@/hooks/useFirestore";
+import { AuthModal } from "@/components/AuthModal";
 
-interface RecurringPayment {
-  id: string;
+interface RecurringPayment extends FirebaseDocument {
   name: string;
   amount: number;
   frequency: "Monthly" | "Weekly" | "Yearly";
@@ -34,79 +36,31 @@ interface RecurringPayment {
 }
 
 const RecurringPayments = () => {
-  const [payments, setPayments] = useState<RecurringPayment[]>([
-    {
-      id: "1",
-      name: "Rent",
-      amount: 1500,
-      frequency: "Monthly",
-      nextDueDate: "2024-02-01",
-      paymentMethod: "Chase Checking",
-      category: "Housing",
-      isActive: true,
-      isAutomatic: true,
-      lastPaid: "2024-01-01"
-    },
-    {
-      id: "2",
-      name: "Netflix",
-      amount: 15.99,
-      frequency: "Monthly",
-      nextDueDate: "2024-02-05",
-      paymentMethod: "Chase Sapphire",
-      category: "Entertainment",
-      isActive: true,
-      isAutomatic: true,
-      lastPaid: "2024-01-05"
-    },
-    {
-      id: "3",
-      name: "Spotify",
-      amount: 9.99,
-      frequency: "Monthly",
-      nextDueDate: "2024-02-10",
-      paymentMethod: "Chase Sapphire",
-      category: "Entertainment",
-      isActive: true,
-      isAutomatic: true,
-      lastPaid: "2024-01-10"
-    },
-    {
-      id: "4",
-      name: "Gym Membership",
-      amount: 45,
-      frequency: "Monthly",
-      nextDueDate: "2024-02-15",
-      paymentMethod: "Citi Double Cash",
-      category: "Health",
-      isActive: true,
-      isAutomatic: false
-    },
-    {
-      id: "5",
-      name: "Car Insurance",
-      amount: 150,
-      frequency: "Monthly",
-      nextDueDate: "2024-02-20",
-      paymentMethod: "Chase Checking",
-      category: "Insurance",
-      isActive: true,
-      isAutomatic: true,
-      lastPaid: "2024-01-20"
-    },
-    {
-      id: "6",
-      name: "Adobe Creative Suite",
-      amount: 52.99,
-      frequency: "Monthly",
-      nextDueDate: "2024-02-12",
-      paymentMethod: "Chase Sapphire",
-      category: "Software",
-      isActive: false,
-      isAutomatic: false,
-      lastPaid: "2023-12-12"
-    }
-  ]);
+  const { user } = useAuth();
+  const { documents: payments, loading, addDocument, updateDocument, deleteDocument } = useFirestore<RecurringPayment>('recurringPayments');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    amount: "",
+    frequency: "",
+    nextDueDate: "",
+    paymentMethod: "",
+    category: "",
+    isAutomatic: false
+  });
+
+  if (!user) {
+    return <AuthModal open={true} onOpenChange={() => {}} />;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   const activePayments = payments.filter(payment => payment.isActive);
   const inactivePayments = payments.filter(payment => !payment.isActive);
@@ -149,6 +103,46 @@ const RecurringPayments = () => {
     return colors[category] || "hsl(var(--muted))";
   };
 
+  const handleAddPayment = async () => {
+    if (!formData.name || !formData.amount || !formData.frequency || !formData.nextDueDate || !formData.paymentMethod || !formData.category) {
+      return;
+    }
+
+    await addDocument({
+      name: formData.name,
+      amount: parseFloat(formData.amount),
+      frequency: formData.frequency as "Monthly" | "Weekly" | "Yearly",
+      nextDueDate: formData.nextDueDate,
+      paymentMethod: formData.paymentMethod,
+      category: formData.category,
+      isActive: true,
+      isAutomatic: formData.isAutomatic
+    });
+
+    setFormData({
+      name: "",
+      amount: "",
+      frequency: "",
+      nextDueDate: "",
+      paymentMethod: "",
+      category: "",
+      isAutomatic: false
+    });
+    setIsAddDialogOpen(false);
+  };
+
+  const handleTogglePayment = async (payment: RecurringPayment) => {
+    await updateDocument(payment.id, { isActive: !payment.isActive });
+  };
+
+  const handleToggleAutomatic = async (payment: RecurringPayment) => {
+    await updateDocument(payment.id, { isAutomatic: !payment.isAutomatic });
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    await deleteDocument(paymentId);
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -158,7 +152,7 @@ const RecurringPayments = () => {
           <p className="text-muted-foreground mt-1">Manage your subscription and recurring expenses</p>
         </div>
         <div className="flex items-center gap-4">
-          <Dialog>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-primary text-primary-foreground hover:scale-105 shadow-elegant">
                 <Plus className="h-4 w-4 mr-2" />
@@ -175,61 +169,77 @@ const RecurringPayments = () => {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="paymentName">Payment Name</Label>
-                  <Input id="paymentName" placeholder="e.g. Netflix, Rent" />
+                  <Input 
+                    id="paymentName" 
+                    placeholder="e.g. Netflix, Rent" 
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="amount">Amount</Label>
-                    <Input id="amount" type="number" placeholder="15.99" />
+                    <Input 
+                      id="amount" 
+                      type="number" 
+                      placeholder="15.99"
+                      value={formData.amount}
+                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="frequency">Frequency</Label>
-                    <Select>
+                    <Select value={formData.frequency} onValueChange={(value) => setFormData({ ...formData, frequency: value })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select frequency" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="yearly">Yearly</SelectItem>
+                        <SelectItem value="Weekly">Weekly</SelectItem>
+                        <SelectItem value="Monthly">Monthly</SelectItem>
+                        <SelectItem value="Yearly">Yearly</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
                 <div>
                   <Label htmlFor="nextDueDate">Next Due Date</Label>
-                  <Input id="nextDueDate" type="date" />
+                  <Input 
+                    id="nextDueDate" 
+                    type="date"
+                    value={formData.nextDueDate}
+                    onChange={(e) => setFormData({ ...formData, nextDueDate: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="paymentMethod">Payment Method</Label>
-                  <Select>
+                  <Select value={formData.paymentMethod} onValueChange={(value) => setFormData({ ...formData, paymentMethod: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select payment method" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="checking">Chase Checking</SelectItem>
-                      <SelectItem value="sapphire">Chase Sapphire</SelectItem>
-                      <SelectItem value="citi">Citi Double Cash</SelectItem>
+                      <SelectItem value="Chase Checking">Chase Checking</SelectItem>
+                      <SelectItem value="Chase Sapphire">Chase Sapphire</SelectItem>
+                      <SelectItem value="Citi Double Cash">Citi Double Cash</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label htmlFor="category">Category</Label>
-                  <Select>
+                  <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="housing">Housing</SelectItem>
-                      <SelectItem value="entertainment">Entertainment</SelectItem>
-                      <SelectItem value="health">Health</SelectItem>
-                      <SelectItem value="insurance">Insurance</SelectItem>
-                      <SelectItem value="software">Software</SelectItem>
-                      <SelectItem value="utilities">Utilities</SelectItem>
+                      <SelectItem value="Housing">Housing</SelectItem>
+                      <SelectItem value="Entertainment">Entertainment</SelectItem>
+                      <SelectItem value="Health">Health</SelectItem>
+                      <SelectItem value="Insurance">Insurance</SelectItem>
+                      <SelectItem value="Software">Software</SelectItem>
+                      <SelectItem value="Utilities">Utilities</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <Button className="w-full">Add Payment</Button>
+                <Button className="w-full" onClick={handleAddPayment}>Add Payment</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -336,13 +346,13 @@ const RecurringPayments = () => {
                     </div>
 
                     <div className="flex items-center gap-2 ml-6">
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => handleToggleAutomatic(payment)}>
                         {payment.isAutomatic ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                       </Button>
                       <Button variant="outline" size="sm">
                         Pay Now
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeletePayment(payment.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
