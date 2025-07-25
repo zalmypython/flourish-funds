@@ -8,112 +8,50 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { DEFAULT_CATEGORIES } from "@/types";
 import { useFirestore, FirebaseDocument } from "@/hooks/useFirestore";
 import { useAuth } from "@/hooks/useAuth";
 import { AuthModal } from "@/components/AuthModal";
-import { 
-  Plus, 
-  PieChart, 
-  AlertTriangle,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  ShoppingCart,
-  Car,
-  Home,
-  Utensils,
-  Coffee,
-  Heart,
-  MoreHorizontal,
-  Edit,
-  Trash2
-} from "lucide-react";
-import { PieChart as RechartsPieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Plus, Target, AlertTriangle, DollarSign, Calendar, Trash2 } from "lucide-react";
 
-interface BudgetCategory extends FirebaseDocument {
+interface Budget extends FirebaseDocument {
   name: string;
-  icon: string;
-  color: string;
-  budgeted: number;
+  category: string;
+  amount: number;
   spent: number;
-  transactions: number;
+  period: 'weekly' | 'monthly' | 'yearly';
+  startDate: string;
+  endDate: string;
+  alertThreshold: number; // percentage
+  status: 'active' | 'exceeded' | 'completed';
 }
 
 const Budgets = () => {
   const { user } = useAuth();
-  const { documents: categories, loading, addDocument, updateDocument, deleteDocument } = useFirestore<BudgetCategory>('budgetCategories');
+  const { documents: budgets, loading, addDocument, updateDocument, deleteDocument } = useFirestore<Budget>('budgets');
+  const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    budget: "",
-    category: ""
+    category: "",
+    amount: "",
+    period: "monthly" as 'weekly' | 'monthly' | 'yearly',
+    alertThreshold: 80
   });
-
-  const { toast } = useToast();
 
   if (!user) {
     return <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />;
   }
 
-  const totalBudgeted = categories.reduce((sum, cat) => sum + cat.budgeted, 0);
-  const totalSpent = categories.reduce((sum, cat) => sum + cat.spent, 0);
+  const activeBudgets = budgets.filter(budget => budget.status === 'active');
+  const totalBudgeted = activeBudgets.reduce((sum, budget) => sum + budget.amount, 0);
+  const totalSpent = activeBudgets.reduce((sum, budget) => sum + budget.spent, 0);
   const totalRemaining = totalBudgeted - totalSpent;
-  const overBudgetCategories = categories.filter(cat => cat.spent > cat.budgeted);
+  const overBudgetCount = activeBudgets.filter(budget => budget.spent > budget.amount).length;
 
-  const chartData = categories.map(cat => ({
-    name: cat.name,
-    spent: cat.spent,
-    budgeted: cat.budgeted,
-    color: cat.color
-  }));
-
-  const pieData = categories.map(cat => ({
-    name: cat.name,
-    value: cat.spent,
-    color: cat.color
-  }));
-
-  const chartConfig = {
-    spent: { label: "Spent", color: "hsl(var(--primary))" },
-    budgeted: { label: "Budgeted", color: "hsl(var(--muted))" }
-  };
-
-  const getProgressColor = (spent: number, budgeted: number) => {
-    const percentage = (spent / budgeted) * 100;
-    if (percentage > 100) return "bg-destructive";
-    if (percentage > 80) return "bg-warning";
-    return "bg-primary";
-  };
-
-  const categoryIconMap: Record<string, string> = {
-    "Food & Dining": "Utensils",
-    "Transportation": "Car", 
-    "Shopping": "ShoppingCart",
-    "Bills & Utilities": "Home",
-    "Entertainment": "Coffee",
-    "Health & Fitness": "Heart"
-  };
-
-  const getIconComponent = (iconName: string) => {
-    const icons: Record<string, any> = {
-      Utensils, Car, ShoppingCart, Home, Coffee, Heart, DollarSign
-    };
-    return icons[iconName] || DollarSign;
-  };
-
-  const categoryColorMap: Record<string, string> = {
-    "Food & Dining": "hsl(var(--accent))",
-    "Transportation": "hsl(var(--primary))",
-    "Shopping": "hsl(var(--warning))",
-    "Bills & Utilities": "hsl(var(--destructive))",
-    "Entertainment": "hsl(var(--success))",
-    "Health & Fitness": "hsl(190 60% 50%)"
-  };
-
-  const handleAddCategory = async () => {
-    if (!formData.name || !formData.budget || !formData.category) {
+  const handleAddBudget = async () => {
+    if (!formData.name || !formData.amount || !formData.category) {
       toast({
         title: "Error",
         description: "Please fill in all required fields.",
@@ -122,32 +60,95 @@ const Budgets = () => {
       return;
     }
 
-    await addDocument({
-      name: formData.name,
-      icon: categoryIconMap[formData.category] || "DollarSign",
-      color: categoryColorMap[formData.category] || "hsl(var(--muted))",
-      budgeted: parseFloat(formData.budget),
-      spent: 0,
-      transactions: 0
-    });
+    try {
+      const now = new Date();
+      const endDate = new Date(now);
+      
+      switch (formData.period) {
+        case 'weekly':
+          endDate.setDate(now.getDate() + 7);
+          break;
+        case 'monthly':
+          endDate.setMonth(now.getMonth() + 1);
+          break;
+        case 'yearly':
+          endDate.setFullYear(now.getFullYear() + 1);
+          break;
+      }
 
-    setFormData({ name: "", budget: "", category: "" });
-    setIsAddDialogOpen(false);
-  };
+      await addDocument({
+        name: formData.name,
+        category: formData.category,
+        amount: parseFloat(formData.amount),
+        spent: 0,
+        period: formData.period,
+        startDate: now.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        alertThreshold: formData.alertThreshold,
+        status: 'active'
+      });
 
-  const handleDeleteCategory = async (categoryId: string) => {
-    await deleteDocument(categoryId);
-  };
-
-  const handleAddTransaction = async (categoryId: string, amount: number) => {
-    const category = categories.find(c => c.id === categoryId);
-    if (category) {
-      await updateDocument(categoryId, {
-        spent: category.spent + amount,
-        transactions: category.transactions + 1
+      setFormData({
+        name: "",
+        category: "",
+        amount: "",
+        period: "monthly",
+        alertThreshold: 80
+      });
+      setIsAddDialogOpen(false);
+      
+      toast({
+        title: "Success",
+        description: "Budget created successfully!"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create budget. Please try again.",
+        variant: "destructive"
       });
     }
   };
+
+  const handleDeleteBudget = async (budgetId: string) => {
+    try {
+      await deleteDocument(budgetId);
+      toast({
+        title: "Success",
+        description: "Budget deleted successfully!"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete budget. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const getBudgetProgress = (budget: Budget) => {
+    return (budget.spent / budget.amount) * 100;
+  };
+
+  const getBudgetStatus = (budget: Budget) => {
+    const progress = getBudgetProgress(budget);
+    if (progress >= 100) return 'exceeded';
+    if (progress >= budget.alertThreshold) return 'warning';
+    return 'good';
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 bg-muted animate-pulse rounded" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-32 bg-muted animate-pulse rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -155,264 +156,226 @@ const Budgets = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Budgets</h1>
-          <p className="text-muted-foreground mt-1">Track spending across categories and stay on budget</p>
+          <p className="text-muted-foreground mt-1">Create and track your spending budgets</p>
         </div>
-        <div className="flex items-center gap-4">
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-primary text-primary-foreground hover:scale-105 shadow-elegant">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Category
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Budget Category</DialogTitle>
-                <DialogDescription>
-                  Create a new budget category to track your spending
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create Budget
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Budget</DialogTitle>
+              <DialogDescription>
+                Set up a new budget to track your spending in a specific category
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="budgetName">Budget Name</Label>
+                <Input 
+                  id="budgetName" 
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Groceries, Entertainment, Gas" 
+                />
+              </div>
+              <div>
+                <Label htmlFor="category">Category</Label>
+                <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEFAULT_CATEGORIES.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="categoryName">Category Name</Label>
+                  <Label htmlFor="amount">Budget Amount</Label>
                   <Input 
-                    id="categoryName" 
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g. Groceries" 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="monthlyBudget">Monthly Budget</Label>
-                  <Input 
-                    id="monthlyBudget" 
+                    id="amount" 
                     type="number" 
-                    value={formData.budget}
-                    onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                    value={formData.amount}
+                    onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
                     placeholder="500" 
                   />
                 </div>
                 <div>
-                  <Label htmlFor="categoryIcon">Category</Label>
-                  <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                  <Label htmlFor="period">Period</Label>
+                  <Select value={formData.period} onValueChange={(value: any) => setFormData(prev => ({ ...prev, period: value }))}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select category type" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Food & Dining">Food & Dining</SelectItem>
-                      <SelectItem value="Transportation">Transportation</SelectItem>
-                      <SelectItem value="Shopping">Shopping</SelectItem>
-                      <SelectItem value="Bills & Utilities">Bills & Utilities</SelectItem>
-                      <SelectItem value="Entertainment">Entertainment</SelectItem>
-                      <SelectItem value="Health & Fitness">Health & Fitness</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={handleAddCategory} className="w-full">Add Category</Button>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+              <div>
+                <Label htmlFor="alertThreshold">Alert Threshold (%)</Label>
+                <Input 
+                  id="alertThreshold" 
+                  type="number" 
+                  value={formData.alertThreshold}
+                  onChange={(e) => setFormData(prev => ({ ...prev, alertThreshold: parseInt(e.target.value) }))}
+                  placeholder="80" 
+                  min="0"
+                  max="100"
+                />
+              </div>
+              <Button onClick={handleAddBudget} className="w-full">Create Budget</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="shadow-card border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Budgeted</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Budgeted</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-foreground">${totalBudgeted.toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground mt-1">This month</p>
+            <div className="text-2xl font-bold">${totalBudgeted.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Active budgets</p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-card border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Spent</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-foreground">${totalSpent.toLocaleString()}</p>
-            <p className={`text-sm mt-1 ${totalSpent > totalBudgeted ? 'text-destructive' : 'text-success'}`}>
-              {((totalSpent / totalBudgeted) * 100).toFixed(1)}% of budget
+            <div className="text-2xl font-bold">${totalSpent.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">
+              {totalBudgeted > 0 ? `${((totalSpent / totalBudgeted) * 100).toFixed(1)}%` : '0%'} of budget
             </p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-card border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Remaining</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Remaining</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${totalRemaining >= 0 ? 'text-success' : 'text-destructive'}`}>
+            <div className={`text-2xl font-bold ${totalRemaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               ${Math.abs(totalRemaining).toLocaleString()}
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
+            </div>
+            <p className="text-xs text-muted-foreground">
               {totalRemaining >= 0 ? 'Under budget' : 'Over budget'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-card border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Alerts</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Budget Alerts</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-warning">{overBudgetCategories.length}</p>
-            <p className="text-sm text-muted-foreground mt-1">Over budget</p>
+            <div className="text-2xl font-bold text-orange-600">{overBudgetCount}</div>
+            <p className="text-xs text-muted-foreground">Over budget</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-card border-border/50">
-          <CardHeader>
-            <CardTitle>Spending Overview</CardTitle>
-            <CardDescription>Budgeted vs actual spending by category</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="name" 
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                  />
-                  <YAxis stroke="hsl(var(--muted-foreground))" />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="budgeted" fill="hsl(var(--muted))" name="Budgeted" />
-                  <Bar dataKey="spent" fill="hsl(var(--primary))" name="Spent" />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card border-border/50">
-          <CardHeader>
-            <CardTitle>Spending Distribution</CardTitle>
-            <CardDescription>How your money is being spent</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPieChart>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Category Cards */}
+      {/* Budget List */}
       <div>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-foreground">Budget Categories</h2>
-          {overBudgetCategories.length > 0 && (
-            <div className="flex items-center gap-2 text-warning">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm">{overBudgetCategories.length} categories over budget</span>
-            </div>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {categories.map((category) => {
-            const percentage = (category.spent / category.budgeted) * 100;
-            const isOverBudget = category.spent > category.budgeted;
-            const remaining = category.budgeted - category.spent;
-            
-            return (
-              <Card key={category.id} className="shadow-card border-border/50 hover:shadow-elegant transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="p-2 rounded-lg text-white"
-                        style={{ backgroundColor: category.color }}
-                      >
-                        {(() => {
-                          const IconComponent = getIconComponent(category.icon);
-                          return <IconComponent className="h-4 w-4" />;
-                        })()}
-                      </div>
+        <h2 className="text-xl font-semibold mb-4">Active Budgets</h2>
+        {activeBudgets.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-12">
+              <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No budgets created yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Create your first budget to start tracking your spending and stay on top of your finances.
+              </p>
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Your First Budget
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {activeBudgets.map((budget) => {
+              const progress = getBudgetProgress(budget);
+              const status = getBudgetStatus(budget);
+              const remaining = budget.amount - budget.spent;
+              
+              return (
+                <Card key={budget.id} className="shadow-card">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-base">{category.name}</CardTitle>
-                        <CardDescription>{category.transactions} transactions</CardDescription>
+                        <CardTitle className="text-base">{budget.name}</CardTitle>
+                        <CardDescription>
+                          {budget.period} • {DEFAULT_CATEGORIES.find(c => c.id === budget.category)?.name}
+                        </CardDescription>
                       </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleAddTransaction(category.id, 50)}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category.id)} className="text-destructive hover:text-destructive">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleDeleteBudget(budget.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-muted-foreground">
-                        ${category.spent.toLocaleString()} / ${category.budgeted.toLocaleString()}
-                      </span>
-                      <span className={`text-sm font-medium ${isOverBudget ? 'text-destructive' : 'text-success'}`}>
-                        {percentage.toFixed(0)}%
-                      </span>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm text-muted-foreground">
+                          ${budget.spent.toLocaleString()} / ${budget.amount.toLocaleString()}
+                        </span>
+                        <Badge variant={status === 'exceeded' ? 'destructive' : status === 'warning' ? 'secondary' : 'default'}>
+                          {progress.toFixed(0)}%
+                        </Badge>
+                      </div>
+                      <Progress 
+                        value={Math.min(progress, 100)} 
+                        className="h-2"
+                      />
+                      <div className="flex justify-between items-center mt-2">
+                        <span className={`text-sm ${status === 'exceeded' ? 'text-red-600' : 'text-green-600'}`}>
+                          {remaining >= 0 
+                            ? `$${remaining.toLocaleString()} remaining`
+                            : `$${Math.abs(remaining).toLocaleString()} over budget`
+                          }
+                        </span>
+                        {status === 'exceeded' && (
+                          <AlertTriangle className="h-4 w-4 text-red-600" />
+                        )}
+                      </div>
                     </div>
-                    <Progress 
-                      value={Math.min(percentage, 100)} 
-                      className="h-2"
-                    />
-                    <div className="flex justify-between items-center mt-2">
-                      <span className={`text-sm font-medium ${isOverBudget ? 'text-destructive' : 'text-success'}`}>
-                        {isOverBudget 
-                          ? `$${Math.abs(remaining).toLocaleString()} over budget`
-                          : `$${remaining.toLocaleString()} remaining`
-                        }
-                      </span>
-                      {isOverBudget && (
-                        <div className="flex items-center gap-1 text-destructive">
-                          <AlertTriangle className="h-3 w-3" />
-                        </div>
-                      )}
+                    
+                    <div className="text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        <span>Until {new Date(budget.endDate).toLocaleDateString()}</span>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleAddTransaction(category.id, 25)}>
-                      Add $25
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleAddTransaction(category.id, 100)}>
-                      Add $100
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
