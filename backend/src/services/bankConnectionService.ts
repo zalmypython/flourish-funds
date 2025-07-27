@@ -1,5 +1,6 @@
 import { encrypt, decrypt, EncryptedData } from '../middleware/encryption';
 import PlaidService, { BankConnection, PlaidAccount, PlaidTransaction } from './plaidService';
+import TransactionService from './transactionService';
 
 interface StoredBankConnection {
   id: string;
@@ -23,9 +24,11 @@ interface TransactionSyncResult {
 class BankConnectionService {
   private connections: Map<string, StoredBankConnection> = new Map();
   private plaidService: PlaidService;
+  private transactionService: TransactionService;
   
   constructor(plaidService: PlaidService) {
     this.plaidService = plaidService;
+    this.transactionService = new TransactionService();
   }
   
   // Add new bank connection
@@ -116,9 +119,15 @@ class BankConnectionService {
     try {
       const accessToken = decrypt(connection.accessToken);
       
+      // Create sync log
+      const syncLog = this.transactionService.createSyncLog(userId, connectionId, 'manual');
+      
       // Default to last 30 days if no dates provided
       const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
       const end = endDate || new Date().toISOString().split('T')[0];
+      
+      // Update sync log status
+      this.transactionService.updateSyncLog(syncLog.id, { status: 'running' });
       
       // Get transactions
       const transactions = await this.plaidService.getTransactions(
@@ -128,25 +137,45 @@ class BankConnectionService {
         connection.accounts.map(acc => acc.accountId)
       );
       
+      // Process transactions through TransactionService
+      const processResult = await this.transactionService.processTransactions(
+        userId,
+        connectionId,
+        transactions
+      );
+
       // Get updated account balances
       const updatedAccounts = await this.plaidService.getAccounts(accessToken);
-      
+
       // Update connection with new account data and sync time
       connection.accounts = updatedAccounts;
       connection.lastSync = new Date();
       this.connections.set(connectionId, connection);
-      
+
+      // Update sync log with results
+      this.transactionService.updateSyncLog(syncLog.id, {
+        status: 'completed',
+        completedAt: new Date(),
+        transactionsAdded: processResult.added.length,
+        transactionsUpdated: processResult.updated.length,
+        errors: processResult.errors,
+      });
+
       return {
-        newTransactions: transactions,
+        newTransactions: processResult.added,
         updatedAccounts,
-        errors: [],
+        errors: processResult.errors,
       };
     } catch (error) {
       console.error('Error syncing transactions:', error);
+      
+      // Update sync log with error
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
       return {
         newTransactions: [],
         updatedAccounts: [],
-        errors: [error instanceof Error ? error.message : 'Unknown error'],
+        errors: [errorMessage],
       };
     }
   }
