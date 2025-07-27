@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import PlaidService from '../services/plaidService';
 import FirebaseBankConnectionService from '../services/firebaseBankConnectionService';
+import CreditCardMappingService from '../services/creditCardMappingService';
 
 const router = express.Router();
 
@@ -14,6 +15,7 @@ const plaidConfig = {
 
 const plaidService = new PlaidService(plaidConfig);
 const bankConnectionService = new FirebaseBankConnectionService(plaidConfig);
+const mappingService = new CreditCardMappingService();
 
 // Create link token for Plaid Link
 router.post('/link/token', authenticateToken, async (req: AuthRequest, res) => {
@@ -142,6 +144,121 @@ router.delete('/connections/:connectionId', authenticateToken, async (req: AuthR
   } catch (error) {
     console.error('Error removing connection:', error);
     res.status(500).json({ error: 'Failed to remove connection' });
+  }
+});
+
+// Get credit card mappings for user
+router.get('/mappings', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const mappings = await mappingService.getUserMappings(userId);
+    res.json({ mappings });
+  } catch (error) {
+    console.error('Error fetching mappings:', error);
+    res.status(500).json({ error: 'Failed to fetch mappings' });
+  }
+});
+
+// Create credit card mapping
+router.post('/mappings', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId;
+    const { plaidAccountId, plaidAccountName, creditCardId, creditCardName, institutionName } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    if (!plaidAccountId || !creditCardId) {
+      return res.status(400).json({ error: 'plaidAccountId and creditCardId are required' });
+    }
+
+    const mapping = await mappingService.createMapping(
+      userId,
+      plaidAccountId,
+      plaidAccountName,
+      creditCardId,
+      creditCardName,
+      institutionName
+    );
+
+    res.json({ mapping });
+  } catch (error) {
+    console.error('Error creating mapping:', error);
+    res.status(500).json({ error: error.message || 'Failed to create mapping' });
+  }
+});
+
+// Update credit card mapping
+router.put('/mappings/:mappingId', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId;
+    const { mappingId } = req.params;
+    const { creditCardId, creditCardName, isActive } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const mapping = await mappingService.updateMapping(mappingId, userId, {
+      creditCardId,
+      creditCardName,
+      isActive
+    });
+
+    if (!mapping) {
+      return res.status(404).json({ error: 'Mapping not found' });
+    }
+
+    res.json({ mapping });
+  } catch (error) {
+    console.error('Error updating mapping:', error);
+    res.status(500).json({ error: 'Failed to update mapping' });
+  }
+});
+
+// Delete credit card mapping
+router.delete('/mappings/:mappingId', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId;
+    const { mappingId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const success = await mappingService.deleteMapping(mappingId, userId);
+
+    if (!success) {
+      return res.status(404).json({ error: 'Mapping not found' });
+    }
+
+    res.json({ message: 'Mapping deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting mapping:', error);
+    res.status(500).json({ error: 'Failed to delete mapping' });
+  }
+});
+
+// Get mapping suggestions
+router.post('/mappings/suggestions', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId;
+    const { plaidAccounts, creditCards } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const suggestions = await mappingService.suggestMappings(userId, plaidAccounts, creditCards);
+    res.json({ suggestions });
+  } catch (error) {
+    console.error('Error getting mapping suggestions:', error);
+    res.status(500).json({ error: 'Failed to get mapping suggestions' });
   }
 });
 

@@ -2,6 +2,9 @@ import { db } from '../config/firebase';
 import { TransactionModel, SyncLogModel } from '../models/bankConnection';
 import { encryptFinancialData, decryptFinancialData } from '../middleware/encryption';
 import { auditLog } from '../middleware/auditLogger';
+import { PlaidTransactionAdapter } from './plaidTransactionAdapter';
+import CreditCardMappingService from './creditCardMappingService';
+import RewardProcessingService from './rewardProcessingService';
 
 interface CategoryMapping {
   plaidCategory: string;
@@ -10,6 +13,10 @@ interface CategoryMapping {
 }
 
 export default class FirebaseTransactionService {
+  private plaidAdapter: PlaidTransactionAdapter;
+  private mappingService: CreditCardMappingService;
+  private rewardService: RewardProcessingService;
+  
   private categoryMappings: CategoryMapping[] = [
     { plaidCategory: 'Food and Drink', internalCategory: 'Food & Dining', confidence: 0.9 },
     { plaidCategory: 'Transportation', internalCategory: 'Transportation', confidence: 0.9 },
@@ -23,6 +30,12 @@ export default class FirebaseTransactionService {
     { plaidCategory: 'Transfer', internalCategory: 'Transfer', confidence: 0.9 }
   ];
 
+  constructor() {
+    this.plaidAdapter = new PlaidTransactionAdapter();
+    this.mappingService = new CreditCardMappingService();
+    this.rewardService = new RewardProcessingService();
+  }
+
   async processTransactions(
     userId: string,
     bankConnectionId: string,
@@ -30,21 +43,34 @@ export default class FirebaseTransactionService {
   ): Promise<{ added: TransactionModel[]; updated: TransactionModel[]; errors: string[] }> {
     const results = { added: [] as TransactionModel[], updated: [] as TransactionModel[], errors: [] as string[] };
 
+    // Get account mappings for reward processing
+    const accountMappings = await this.mappingService.getAccountMappingsMap(userId);
+
     for (const plaidTx of plaidTransactions) {
       try {
         const existingTransaction = await this.findTransactionByPlaidId(plaidTx.transaction_id);
+
+        let processedTransaction: TransactionModel;
 
         if (existingTransaction) {
           // Update existing transaction
           const updatedTransaction = await this.updateTransaction(existingTransaction.id, userId, plaidTx);
           if (updatedTransaction) {
             results.updated.push(updatedTransaction);
+            processedTransaction = updatedTransaction;
+          } else {
+            continue;
           }
         } else {
           // Create new transaction
           const newTransaction = await this.createTransaction(userId, bankConnectionId, plaidTx);
           results.added.push(newTransaction);
+          processedTransaction = newTransaction;
         }
+
+        // Process rewards if this is a credit card transaction
+        await this.processRewardsForTransaction(processedTransaction, accountMappings, userId);
+
       } catch (error: any) {
         results.errors.push(`Error processing transaction ${plaidTx.transaction_id}: ${error.message}`);
       }
@@ -362,5 +388,53 @@ export default class FirebaseTransactionService {
       ...updates,
       completedAt: updates.status === 'completed' || updates.status === 'failed' ? new Date() : undefined
     });
+  }
+
+  /**
+   * Process rewards for a Plaid transaction if it's mapped to a credit card
+   */
+  private async processRewardsForTransaction(
+    plaidTransaction: TransactionModel,
+    accountMappings: Map<string, { accountType: 'bank' | 'credit'; creditCardId?: string }>,
+    userId: string
+  ): Promise<void> {
+    try {
+      const mapping = accountMappings.get(plaidTransaction.accountId);
+      
+      if (mapping && mapping.accountType === 'credit' && mapping.creditCardId) {
+        // Convert to manual transaction format
+        const manualTransaction = this.plaidAdapter.convertToManualTransaction(
+          plaidTransaction,
+          'credit',
+          mapping.creditCardId
+        );
+
+        // Process rewards and bonuses
+        await this.rewardService.processTransactionRewards(
+          manualTransaction,
+          mapping.creditCardId
+        );
+
+        // Update budget spending
+        await this.rewardService.updateBudgetSpending(manualTransaction, userId);
+
+        auditLog({
+          event: 'plaid_transaction_rewards_processed',
+          userId,
+          ip: 'server',
+          userAgent: 'server',
+          timestamp: new Date(),
+          details: { 
+            transactionId: plaidTransaction.id, 
+            creditCardId: mapping.creditCardId,
+            category: manualTransaction.category,
+            amount: manualTransaction.amount
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error processing rewards for transaction:', error);
+      // Don't throw - transaction should still be saved even if reward processing fails
+    }
   }
 }
