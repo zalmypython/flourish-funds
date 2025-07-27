@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -11,11 +12,14 @@ import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/utils/logger";
 import { AuthModal } from "@/components/AuthModal";
+import { InsuranceDashboard } from "@/components/insurance/InsuranceDashboard";
+import { useInsurance } from "@/hooks/useInsurance";
 
 const Reports = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { handleError, executeWithErrorHandling } = useErrorHandler('ReportsPage');
+  const { policies, claims, createPolicy, createClaim } = useInsurance();
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("");
@@ -105,7 +109,7 @@ const Reports = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Reports</h1>
-          <p className="text-muted-foreground mt-1">Generate and download financial reports</p>
+          <p className="text-muted-foreground mt-1">Generate reports and manage your financial data</p>
         </div>
         <Dialog>
           <DialogTrigger asChild>
@@ -165,7 +169,16 @@ const Reports = () => {
         </Dialog>
       </div>
 
-      {/* Summary Stats */}
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="spending">Spending</TabsTrigger>
+          <TabsTrigger value="income">Income</TabsTrigger>
+          <TabsTrigger value="insurance">Insurance</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card className="shadow-card border-border/50">
           <CardHeader className="pb-3">
@@ -208,38 +221,95 @@ const Reports = () => {
         </Card>
       </div>
 
-      {/* Reports Grid */}
-      <div>
-        <h2 className="text-xl font-semibold text-foreground mb-6">Available Reports</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {reports.map((report, index) => {
-            const IconComponent = report.icon;
-            return (
-              <Card key={index} className="shadow-card border-border/50 hover:shadow-elegant transition-shadow">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <IconComponent className="h-4 w-4 text-primary" />
-                    {report.name}
-                  </CardTitle>
-                  <CardDescription className="flex items-center justify-between">
-                    <span>{report.period}</span>
-                    <Badge variant="outline" className="text-xs">{report.type}</Badge>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary">{report.size}</Badge>
-                    <Button variant="outline" size="sm" className="hover:bg-primary hover:text-primary-foreground">
-                      <Download className="h-4 w-4 mr-1" />
-                      Download
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
+          {/* Reports Grid */}
+          <div>
+            <h2 className="text-xl font-semibold text-foreground mb-6">Available Reports</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {reports.map((report, index) => {
+                const IconComponent = report.icon;
+                return (
+                  <Card key={index} className="shadow-card border-border/50 hover:shadow-elegant transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <IconComponent className="h-4 w-4 text-primary" />
+                        {report.name}
+                      </CardTitle>
+                      <CardDescription className="flex items-center justify-between">
+                        <span>{report.period}</span>
+                        <Badge variant="outline" className="text-xs">{report.type}</Badge>
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary">{report.size}</Badge>
+                        <Button variant="outline" size="sm" className="hover:bg-primary hover:text-primary-foreground">
+                          <Download className="h-4 w-4 mr-1" />
+                          Download
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="spending" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Spending Reports</CardTitle>
+              <CardDescription>
+                Analyze your spending patterns and trends across different categories
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Spending reports coming soon</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="income" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Income Reports</CardTitle>
+              <CardDescription>
+                Track your income sources and trends over time
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Income reports coming soon</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="insurance" className="space-y-6">
+          <InsuranceDashboard
+            policies={policies}
+            claims={claims}
+            onCreatePolicy={() => {
+              // TODO: Open policy creation modal
+              console.log('Create policy clicked');
+            }}
+            onCreateClaim={() => {
+              // TODO: Open claim creation modal
+              console.log('Create claim clicked');
+            }}
+            onViewPolicy={(policy) => {
+              // TODO: Open policy details modal
+              console.log('View policy:', policy);
+            }}
+            onViewClaim={(claim) => {
+              // TODO: Open claim details modal
+              console.log('View claim:', claim);
+            }}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

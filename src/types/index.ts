@@ -49,6 +49,12 @@ export interface Transaction extends BaseDocument {
   plaidTransactionId?: string;
   plaidAccountId?: string;
   bankConnectionId?: string;
+  source?: 'manual' | 'plaid';
+  rewardEarned?: number;
+  // Insurance linking fields
+  insurancePolicyId?: string;
+  insuranceClaimId?: string;
+  insuranceType?: 'premium' | 'claim_payment' | 'deductible' | 'copay' | 'coinsurance';
 }
 
 export interface TransactionCategory {
@@ -292,6 +298,61 @@ export interface Portfolio {
   dailyChangePercent: number;
 }
 
+// Insurance Types
+export interface InsurancePolicy {
+  id: string;
+  userId: string;
+  policyNumber: string;
+  provider: string;
+  type: 'health' | 'auto' | 'home' | 'life' | 'disability' | 'other';
+  policyName: string;
+  premium: number;
+  billingCycle: 'monthly' | 'quarterly' | 'semi-annual' | 'annual';
+  deductible?: number;
+  coverageAmount?: number;
+  effectiveDate: string;
+  expirationDate: string;
+  status: 'active' | 'inactive' | 'cancelled' | 'expired';
+  linkedTransactionIds: string[];
+  premiumSchedule: {
+    nextDueDate: string;
+    lastPaidDate?: string;
+    autoPayEnabled: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InsuranceClaim {
+  id: string;
+  userId: string;
+  policyId: string;
+  claimNumber: string;
+  dateOfLoss: string;
+  claimAmount: number;
+  approvedAmount?: number;
+  paidAmount?: number;
+  status: 'submitted' | 'under_review' | 'approved' | 'denied' | 'paid' | 'closed';
+  description: string;
+  linkedTransactionIds: string[];
+  documentIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InsuranceDocument {
+  id: string;
+  userId: string;
+  policyId?: string;
+  claimId?: string;
+  type: 'policy' | 'eob' | 'bill' | 'claim_form' | 'receipt' | 'other';
+  filename: string;
+  url: string;
+  uploadDate: string;
+  size: number;
+  mimeType: string;
+}
+
 export const DEFAULT_CATEGORIES: TransactionCategory[] = [
   { id: 'food', name: 'Food & Dining', icon: 'UtensilsCrossed', color: '#e74c3c' },
   { id: 'transportation', name: 'Transportation', icon: 'Car', color: '#3498db' },
@@ -299,6 +360,7 @@ export const DEFAULT_CATEGORIES: TransactionCategory[] = [
   { id: 'entertainment', name: 'Entertainment', icon: 'Gamepad2', color: '#9b59b6' },
   { id: 'bills', name: 'Bills & Utilities', icon: 'FileText', color: '#f39c12' },
   { id: 'healthcare', name: 'Healthcare', icon: 'Heart', color: '#e74c3c' },
+  { id: 'insurance', name: 'Insurance', icon: 'Shield', color: '#8b5cf6', subcategories: ['Health Insurance', 'Auto Insurance', 'Home Insurance', 'Life Insurance'] },
   { id: 'income', name: 'Income', icon: 'TrendingUp', color: '#27ae60' },
   { id: 'stocks', name: 'Stocks', icon: 'TrendingUp', color: '#8b5cf6' },
   { id: 'transfer', name: 'Transfer', icon: 'ArrowRightLeft', color: '#95a5a6' },
