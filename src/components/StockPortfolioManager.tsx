@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth';
 import { stockApi } from '../services/stockApi';
 import { StockHolding, StockTransaction, Portfolio } from '../types';
 import { StockTransactionForm } from './StockTransactionForm';
+import { ApiKeySetup } from './ApiKeySetup';
 
 export const StockPortfolioManager = () => {
   const { user } = useAuth();
@@ -246,6 +247,9 @@ export const StockPortfolioManager = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* API Key Setup */}
+      <ApiKeySetup />
 
       {/* Action Button */}
       <div className="flex justify-between items-center">

@@ -34,8 +34,15 @@ interface AlphaVantageSearch {
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
-// You'll need to get a free API key from Alpha Vantage
-const API_KEY = 'demo'; // Replace with actual API key when ready
+// Get API key from localStorage or use demo
+const getApiKey = () => {
+  return localStorage.getItem('alphavantage_api_key') || 'demo';
+};
+
+// Function to set API key
+export const setAlphaVantageApiKey = (apiKey: string) => {
+  localStorage.setItem('alphavantage_api_key', apiKey);
+};
 
 class StockApiService {
   private baseUrl = 'https://www.alphavantage.co/query';
@@ -75,6 +82,7 @@ class StockApiService {
   }
 
   async getStockQuote(symbol: string) {
+    const API_KEY = getApiKey();
     const url = `${this.baseUrl}?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
     const cacheKey = `quote_${symbol}`;
     
@@ -98,6 +106,7 @@ class StockApiService {
   }
 
   async searchStocks(query: string) {
+    const API_KEY = getApiKey();
     const url = `${this.baseUrl}?function=SYMBOL_SEARCH&keywords=${query}&apikey=${API_KEY}`;
     const cacheKey = `search_${query}`;
     
