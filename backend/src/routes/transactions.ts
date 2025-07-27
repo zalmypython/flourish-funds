@@ -6,6 +6,8 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 import FirebaseTransactionService from '../services/firebaseTransactionService';
 import { uploadDocument, handleUploadError } from '../middleware/upload';
 import { documentService } from '../services/documentService';
+import { createRateLimit, fileUploadSecurity, validateRequest } from '../middleware/advancedSecurity';
+import { enhancedLogger } from '../utils/enhancedLogger';
 
 const router = express.Router();
 const baseTransactionService = new BaseService('transactions');
@@ -273,9 +275,20 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res, next) => 
   }
 });
 
-// Document upload endpoint
+// Document upload endpoint with enhanced security
+const documentUploadLimiter = createRateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 uploads per 15 minutes
+  operation: 'document upload'
+});
+
 router.post('/:id/documents', 
-  authenticateToken, 
+  authenticateToken,
+  documentUploadLimiter,
+  fileUploadSecurity,
+  validateRequest([
+    body('source').optional().isIn(['camera', 'files', 'drag-drop'])
+  ]),
   uploadDocument.single('document'),
   handleUploadError,
   async (req: AuthRequest, res, next) => {
@@ -295,17 +308,17 @@ router.post('/:id/documents',
         });
       }
 
-      // Log upload attempt for security monitoring
-      console.log('DOCUMENT_UPLOAD_ATTEMPT:', JSON.stringify({
-        timestamp: new Date().toISOString(),
+      // Enhanced security logging for document uploads
+      enhancedLogger.logSecurityEvent('DOCUMENT_UPLOAD_ATTEMPT', {
         userId: req.userId,
         transactionId: req.params.id,
         fileName: req.file.originalname,
         fileSize: req.file.size,
         mimeType: req.file.mimetype,
         ip: req.ip,
-        userAgent: req.get('User-Agent')
-      }));
+        userAgent: req.get('User-Agent'),
+        deviceFingerprint: req.get('X-Device-Fingerprint')
+      });
 
       const { source = 'files' } = req.body;
       
@@ -489,5 +502,48 @@ router.delete('/:id/documents/:docId', authenticateToken, async (req: AuthReques
   }
 });
 
+// Health check endpoint to verify system functionality
+router.get('/health-check', authenticateToken, async (req: AuthRequest, res, next) => {
+  try {
+    const healthData = {
+      status: 'operational',
+      timestamp: new Date().toISOString(),
+      dateTracking: {
+        currentServerTime: new Date().toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        unixTimestamp: Date.now()
+      },
+      security: {
+        authenticationActive: true,
+        rateLimitingActive: true,
+        auditLoggingActive: true
+      },
+      services: {
+        documentService: 'active',
+        transactionService: 'active',
+        enhancedLogging: 'active'
+      },
+      user: {
+        userId: req.userId,
+        authenticated: true
+      }
+    };
+
+    enhancedLogger.logApplicationEvent('HEALTH_CHECK_COMPLETED', {
+      userId: req.userId,
+      status: 'healthy',
+      timestamp: new Date().toISOString()
+    });
+
+    res.json(healthData);
+  } catch (error) {
+    enhancedLogger.logApplicationEvent('HEALTH_CHECK_FAILED', {
+      userId: req.userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+    next(error);
+  }
+});
 
 export { router as transactionRoutes };

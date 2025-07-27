@@ -17,10 +17,15 @@ import {
   outputEncoding, 
   xssAuditLogger 
 } from './middleware/xssProtection';
+import { 
+  createRateLimit, 
+  IPMonitor, 
+  fileUploadSecurity 
+} from './middleware/advancedSecurity';
+import { enhancedLogger } from './utils/enhancedLogger';
 import { authRoutes } from './routes/auth';
 import { bankAccountRoutes } from './routes/bankAccounts';
 import { creditCardRoutes } from './routes/creditCards';
-import { notificationRoutes } from './routes/notifications';
 import { notificationRoutes } from './routes/notifications';
 import { transactionRoutes } from './routes/transactions';
 import { budgetRoutes } from './routes/budgets';
@@ -44,6 +49,14 @@ app.use(securityHeaders);
 app.use(requestSizeLimiter);
 app.use(speedLimiter);
 app.use(xssAuditLogger);
+app.use(IPMonitor.middleware);
+
+// Initialize enhanced logging
+enhancedLogger.logApplicationEvent('SERVER_STARTING', {
+  port: PORT,
+  nodeEnv: process.env.NODE_ENV,
+  timestamp: new Date().toISOString()
+});
 
 // CORS configuration
 app.use(cors({
@@ -86,4 +99,8 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  enhancedLogger.logApplicationEvent('SERVER_STARTED', {
+    port: PORT,
+    timestamp: new Date().toISOString()
+  });
 });
