@@ -10,7 +10,7 @@ const mockBonuses = [
     description: 'Spend $3000 in 3 months',
     requirement: 'Spend $3000 in 3 months',
     bonusAmount: "50000",
-    bonusValue: '$500',
+    bonusValue: 500,
     progress: 1500,
     currentSpending: 1500,
     spendingRequired: 3000,
@@ -18,7 +18,7 @@ const mockBonuses = [
     endDate: '2024-12-31',
     isCompleted: false,
     isActive: true,
-    status: 'active' as const,
+    status: 'in_progress' as const,
     rewardType: 'points' as const,
     autoTracking: true
   }
