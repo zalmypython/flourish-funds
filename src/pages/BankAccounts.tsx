@@ -11,12 +11,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Eye, EyeOff, Edit, CreditCard, PiggyBank, Building, Building2, Archive, RefreshCcw, LinkIcon } from "lucide-react";
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { PlaidLinkButton, BankConnectionCard } from "@/components/PlaidLinkButton";
 import { useBankConnections } from "@/hooks/useBankConnections";
 import { Separator } from "@/components/ui/separator";
+import { EditAccountDialog } from "@/components/EditAccountDialog";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { logger } from "@/utils/logger";
 
 interface BankAccount {
   id: string;
@@ -54,6 +57,8 @@ export default function BankAccounts() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -159,6 +164,22 @@ export default function BankAccounts() {
     }
   };
 
+  const handleEditAccount = (account: any) => {
+    logger.trackUserAction('edit_account_opened', { accountId: account.id });
+    setEditingAccount(account);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveAccount = async (accountId: string, updates: any) => {
+    try {
+      await updateDocument(accountId, updates);
+      logger.trackUserAction('account_updated', { accountId, updates });
+    } catch (error) {
+      logger.error('Failed to update account', { accountId, error });
+      throw error;
+    }
+  };
+
   const handleAddAccount = async () => {
     if (!formData.name || !formData.type || !formData.initialBalance) {
       toast({
@@ -170,7 +191,7 @@ export default function BankAccounts() {
     }
 
     try {
-      await addDocument({
+      const accountData = {
         name: formData.name,
         type: formData.type,
         initialBalance: parseFloat(formData.initialBalance),
@@ -180,7 +201,10 @@ export default function BankAccounts() {
         isActive: true,
         createdDate: new Date().toISOString().split('T')[0],
         description: formData.description || ''
-      });
+      };
+
+      await addDocument(accountData);
+      logger.trackUserAction('account_added', { accountType: formData.type });
 
       toast({
         title: "Account Added",
@@ -198,6 +222,7 @@ export default function BankAccounts() {
       });
       setIsAddDialogOpen(false);
     } catch (error) {
+      logger.error('Failed to add account', { error });
       toast({
         title: "Error",
         description: "Failed to add account. Please try again.",
@@ -215,7 +240,8 @@ export default function BankAccounts() {
   const connectedAccountsBalance = getTotalBalance();
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <ErrorBoundary>
+      <div className="container mx-auto p-6 space-y-8">
       {/* Show auth modal if needed */}
       {showAuthModal && <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />}
 
@@ -426,9 +452,7 @@ export default function BankAccounts() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        /* TODO: Add edit functionality */
-                      }}
+                      onClick={() => handleEditAccount(acc)}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -540,6 +564,15 @@ export default function BankAccounts() {
           </div>
         </div>
       )}
+
+      {/* Edit Account Dialog */}
+      <EditAccountDialog
+        account={editingAccount}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        onSave={handleSaveAccount}
+      />
     </div>
+    </ErrorBoundary>
   );
 }
