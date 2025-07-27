@@ -3,6 +3,14 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { initializeFirebase } from './config/firebase';
 import { errorHandler } from './middleware/errorHandler';
+import { 
+  authLimiter, 
+  apiLimiter, 
+  speedLimiter, 
+  securityHeaders, 
+  requestSizeLimiter 
+} from './middleware/security';
+import { auditApiAccess } from './middleware/auditLogger';
 import { authRoutes } from './routes/auth';
 import { bankAccountRoutes } from './routes/bankAccounts';
 import { creditCardRoutes } from './routes/creditCards';
@@ -21,28 +29,42 @@ const PORT = process.env.PORT || 3000;
 // Initialize Firebase
 initializeFirebase();
 
-// Middleware
+// Security middleware (applied first)
+app.use(securityHeaders);
+app.use(requestSizeLimiter);
+app.use(speedLimiter);
+
+// CORS configuration
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:8080',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining']
 }));
-app.use(express.json());
+
+// Body parsing with size limits
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Audit logging for all API requests
+app.use('/api', auditApiAccess);
 
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/bank-accounts', bankAccountRoutes);
-app.use('/api/credit-cards', creditCardRoutes);
-app.use('/api/transactions', transactionRoutes);
-app.use('/api/budgets', budgetRoutes);
-app.use('/api/savings-goals', savingsGoalRoutes);
-app.use('/api/recurring-payments', recurringPaymentRoutes);
-app.use('/api/stocks', stockRoutes);
-app.use('/api/account-goals', accountGoalRoutes);
+// Routes with appropriate rate limiting
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/bank-accounts', apiLimiter, bankAccountRoutes);
+app.use('/api/credit-cards', apiLimiter, creditCardRoutes);
+app.use('/api/transactions', apiLimiter, transactionRoutes);
+app.use('/api/budgets', apiLimiter, budgetRoutes);
+app.use('/api/savings-goals', apiLimiter, savingsGoalRoutes);
+app.use('/api/recurring-payments', apiLimiter, recurringPaymentRoutes);
+app.use('/api/stocks', apiLimiter, stockRoutes);
+app.use('/api/account-goals', apiLimiter, accountGoalRoutes);
 
 // Error handling
 app.use(errorHandler);

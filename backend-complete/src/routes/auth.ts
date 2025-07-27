@@ -1,66 +1,52 @@
 import express from 'express';
-import { auth } from '../config/firebase';
-import jwt from 'jsonwebtoken';
-import { z } from 'zod';
+import { authService } from '../services/authService';
+import { loginValidation, registerValidation, handleValidationErrors } from '../middleware/security';
+import { auditAuthEvents } from '../middleware/auditLogger';
 
 const router = express.Router();
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6)
-});
-
-const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6)
-});
-
-// Register
-router.post('/register', async (req, res, next) => {
-  try {
-    const { email, password } = registerSchema.parse(req.body);
-    
-    const userRecord = await auth.createUser({
-      email,
-      password
-    });
-    
-    const token = jwt.sign(
-      { userId: userRecord.uid, email: userRecord.email },
-      process.env.JWT_SECRET!,
-      { expiresIn: '24h' }
-    );
-    
-    res.status(201).json({
-      user: { id: userRecord.uid, email: userRecord.email },
-      token
-    });
-  } catch (error) {
-    next(error);
+// Register - with proper password verification and security
+router.post('/register', 
+  registerValidation,
+  handleValidationErrors,
+  auditAuthEvents('register'),
+  async (req, res, next) => {
+    try {
+      const { email, password } = req.body;
+      const ip = req.ip || req.connection.remoteAddress || 'unknown';
+      
+      const result = await authService.registerUser(email, password, ip);
+      
+      res.status(201).json(result);
+    } catch (error: any) {
+      if (error.message === 'User already exists') {
+        return res.status(409).json({ error: 'User already exists' });
+      }
+      next(error);
+    }
   }
-});
+);
 
-// Login
-router.post('/login', async (req, res, next) => {
-  try {
-    const { email, password } = loginSchema.parse(req.body);
-    
-    // Create a custom token for the user
-    const userRecord = await auth.getUserByEmail(email);
-    
-    const token = jwt.sign(
-      { userId: userRecord.uid, email: userRecord.email },
-      process.env.JWT_SECRET!,
-      { expiresIn: '24h' }
-    );
-    
-    res.json({
-      user: { id: userRecord.uid, email: userRecord.email },
-      token
-    });
-  } catch (error) {
-    next(error);
+// Login - with proper password verification and security
+router.post('/login', 
+  loginValidation,
+  handleValidationErrors,
+  auditAuthEvents('login'),
+  async (req, res, next) => {
+    try {
+      const { email, password } = req.body;
+      const ip = req.ip || req.connection.remoteAddress || 'unknown';
+      
+      const result = await authService.loginUser(email, password, ip);
+      
+      res.json(result);
+    } catch (error: any) {
+      if (error.message === 'Invalid credentials') {
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+      next(error);
+    }
   }
-});
+);
 
 export { router as authRoutes };
