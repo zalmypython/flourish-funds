@@ -26,6 +26,7 @@ import { savingsGoalRoutes } from './routes/savingsGoals';
 import { recurringPaymentRoutes } from './routes/recurringPayments';
 import { stockRoutes } from './routes/stocks';
 import { accountGoalRoutes } from './routes/accountGoals';
+import plaidRoutes from './routes/plaidRoutes';
 
 dotenv.config();
 
@@ -75,6 +76,7 @@ app.use('/api/savings-goals', apiLimiter, savingsGoalRoutes);
 app.use('/api/recurring-payments', apiLimiter, recurringPaymentRoutes);
 app.use('/api/stocks', apiLimiter, stockRoutes);
 app.use('/api/account-goals', apiLimiter, accountGoalRoutes);
+app.use('/api/plaid', apiLimiter, plaidRoutes);
 
 // Error handling
 app.use(errorHandler);
