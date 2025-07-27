@@ -326,8 +326,14 @@ const CreditCards = () => {
                       </div>
                     </div>
                     <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => setEditingCard(card)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="sm" onClick={() => handleDeactivateCard(card.id)}>
                         <Archive className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteCard(card.id)} className="text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -445,6 +451,15 @@ const CreditCards = () => {
                       >
                         <RotateCcw className="h-4 w-4 mr-1" />
                         Restore
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleDeleteCard(card.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
                       </Button>
                     </div>
                   </div>
