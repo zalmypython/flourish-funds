@@ -1,7 +1,7 @@
 import express from 'express';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 import PlaidService from '../services/plaidService';
-import BankConnectionService from '../services/bankConnectionService';
+import FirebaseBankConnectionService from '../services/firebaseBankConnectionService';
 
 const router = express.Router();
 
@@ -13,12 +13,12 @@ const plaidConfig = {
 };
 
 const plaidService = new PlaidService(plaidConfig);
-const bankConnectionService = new BankConnectionService(plaidService);
+const bankConnectionService = new FirebaseBankConnectionService(plaidConfig);
 
 // Create link token for Plaid Link
-router.post('/link/token', authenticateToken, async (req, res) => {
+router.post('/link/token', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user?.uid;
+    const userId = req.userId;
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
@@ -32,9 +32,9 @@ router.post('/link/token', authenticateToken, async (req, res) => {
 });
 
 // Exchange public token and create bank connection
-router.post('/link/exchange', authenticateToken, async (req, res) => {
+router.post('/link/exchange', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user?.uid;
+    const userId = req.userId;
     const { publicToken } = req.body;
 
     if (!userId) {
@@ -54,14 +54,14 @@ router.post('/link/exchange', authenticateToken, async (req, res) => {
 });
 
 // Get user's bank connections
-router.get('/connections', authenticateToken, async (req, res) => {
+router.get('/connections', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user?.uid;
+    const userId = req.userId;
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const connections = bankConnectionService.getUserConnections(userId);
+    const connections = await bankConnectionService.getUserConnections(userId);
     
     // Remove sensitive data from response
     const safeConnections = connections.map(conn => ({
@@ -87,9 +87,9 @@ router.get('/connections', authenticateToken, async (req, res) => {
 });
 
 // Sync transactions for a specific connection
-router.post('/connections/:connectionId/sync', authenticateToken, async (req, res) => {
+router.post('/connections/:connectionId/sync', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user?.uid;
+    const userId = req.userId;
     const { connectionId } = req.params;
     const { startDate, endDate } = req.body;
 
@@ -112,9 +112,9 @@ router.post('/connections/:connectionId/sync', authenticateToken, async (req, re
 });
 
 // Sync all user connections
-router.post('/sync/all', authenticateToken, async (req, res) => {
+router.post('/sync/all', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user?.uid;
+    const userId = req.userId;
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
@@ -128,9 +128,9 @@ router.post('/sync/all', authenticateToken, async (req, res) => {
 });
 
 // Remove bank connection
-router.delete('/connections/:connectionId', authenticateToken, async (req, res) => {
+router.delete('/connections/:connectionId', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user?.uid;
+    const userId = req.userId;
     const { connectionId } = req.params;
 
     if (!userId) {
