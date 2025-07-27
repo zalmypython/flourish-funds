@@ -1,4 +1,5 @@
 import express from 'express';
+import { body, param, validationResult } from 'express-validator';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import PlaidService from '../services/plaidService';
 import FirebaseBankConnectionService from '../services/firebaseBankConnectionService';
@@ -16,6 +17,31 @@ const plaidConfig = {
 const plaidService = new PlaidService(plaidConfig);
 const bankConnectionService = new FirebaseBankConnectionService(plaidConfig);
 const mappingService = new CreditCardMappingService();
+
+// Validation middleware
+const handleValidationErrors = (req: any, res: any, next: any) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+};
+
+// Validation rules
+const createMappingValidation = [
+  body('plaidAccountId').isAlphanumeric().isLength({ min: 1, max: 50 }).trim(),
+  body('plaidAccountName').isLength({ min: 1, max: 100 }).trim(),
+  body('creditCardId').isAlphanumeric().isLength({ min: 1, max: 50 }).trim(),
+  body('creditCardName').isLength({ min: 1, max: 100 }).trim(),
+  body('institutionName').isLength({ min: 1, max: 100 }).trim(),
+];
+
+const updateMappingValidation = [
+  param('mappingId').isAlphanumeric().isLength({ min: 1, max: 50 }),
+  body('creditCardId').optional().isAlphanumeric().isLength({ min: 1, max: 50 }).trim(),
+  body('creditCardName').optional().isLength({ min: 1, max: 100 }).trim(),
+  body('isActive').optional().isBoolean(),
+];
 
 // Create link token for Plaid Link
 router.post('/link/token', authenticateToken, async (req: AuthRequest, res) => {
@@ -164,7 +190,7 @@ router.get('/mappings', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 // Create credit card mapping
-router.post('/mappings', authenticateToken, async (req: AuthRequest, res) => {
+router.post('/mappings', authenticateToken, createMappingValidation, handleValidationErrors, async (req: AuthRequest, res) => {
   try {
     const userId = req.userId;
     const { plaidAccountId, plaidAccountName, creditCardId, creditCardName, institutionName } = req.body;
@@ -194,7 +220,7 @@ router.post('/mappings', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 // Update credit card mapping
-router.put('/mappings/:mappingId', authenticateToken, async (req: AuthRequest, res) => {
+router.put('/mappings/:mappingId', authenticateToken, updateMappingValidation, handleValidationErrors, async (req: AuthRequest, res) => {
   try {
     const userId = req.userId;
     const { mappingId } = req.params;
@@ -222,7 +248,7 @@ router.put('/mappings/:mappingId', authenticateToken, async (req: AuthRequest, r
 });
 
 // Delete credit card mapping
-router.delete('/mappings/:mappingId', authenticateToken, async (req: AuthRequest, res) => {
+router.delete('/mappings/:mappingId', authenticateToken, [param('mappingId').isAlphanumeric().isLength({ min: 1, max: 50 })], handleValidationErrors, async (req: AuthRequest, res) => {
   try {
     const userId = req.userId;
     const { mappingId } = req.params;

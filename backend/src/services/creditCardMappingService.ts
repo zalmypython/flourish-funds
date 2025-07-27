@@ -1,5 +1,23 @@
 import { db } from '../config/firebase';
 import { encryptFinancialData, decryptFinancialData } from '../middleware/encryption';
+import { auditLog } from '../middleware/auditLogger';
+
+// Input validation helpers
+const validateUserId = (userId: string): boolean => {
+  return typeof userId === 'string' && userId.length > 0 && userId.length <= 128;
+};
+
+const validateAccountId = (accountId: string): boolean => {
+  return typeof accountId === 'string' && /^[a-zA-Z0-9_-]+$/.test(accountId) && accountId.length <= 100;
+};
+
+const validateCreditCardId = (creditCardId: string): boolean => {
+  return typeof creditCardId === 'string' && /^[a-zA-Z0-9_-]+$/.test(creditCardId) && creditCardId.length <= 100;
+};
+
+const validateName = (name: string): boolean => {
+  return typeof name === 'string' && name.trim().length > 0 && name.length <= 200;
+};
 
 export interface CreditCardMapping {
   id: string;
@@ -28,6 +46,26 @@ export default class CreditCardMappingService {
     creditCardName: string,
     institutionName: string
   ): Promise<CreditCardMapping> {
+    // Input validation
+    if (!validateUserId(userId)) {
+      throw new Error('Invalid user ID');
+    }
+    if (!validateAccountId(plaidAccountId)) {
+      throw new Error('Invalid Plaid account ID');
+    }
+    if (!validateCreditCardId(creditCardId)) {
+      throw new Error('Invalid credit card ID');
+    }
+    if (!validateName(plaidAccountName)) {
+      throw new Error('Invalid Plaid account name');
+    }
+    if (!validateName(creditCardName)) {
+      throw new Error('Invalid credit card name');
+    }
+    if (!validateName(institutionName)) {
+      throw new Error('Invalid institution name');
+    }
+
     // Check if mapping already exists
     const existing = await this.getMappingByPlaidAccount(userId, plaidAccountId);
     if (existing) {
@@ -48,6 +86,19 @@ export default class CreditCardMappingService {
 
     const encryptedData = encryptFinancialData(mapping);
     const docRef = await db.collection(this.collection).add(encryptedData);
+
+    auditLog({
+      event: 'credit_card_mapping_created',
+      userId,
+      ip: 'server',
+      userAgent: 'server',
+      timestamp: new Date(),
+      details: { 
+        mappingId: docRef.id, 
+        plaidAccountId: plaidAccountId.substring(0, 8) + '***',
+        creditCardId: creditCardId.substring(0, 8) + '***'
+      }
+    });
 
     return { id: docRef.id, ...mapping };
   }

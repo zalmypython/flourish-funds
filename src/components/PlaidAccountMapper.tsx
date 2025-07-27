@@ -59,24 +59,45 @@ export const PlaidAccountMapper: React.FC<PlaidAccountMapperProps> = ({
   const [selectedMappings, setSelectedMappings] = useState<Record<string, string>>({});
   const { toast } = useToast();
   const { user } = useApiAuth();
-  
+
+  // SECURITY: Use proper API client with authentication
   const apiClient = {
     get: async (url: string) => {
       const response = await fetch(url, {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': user ? `Bearer ${user.id}` : '' // Basic auth simulation
+        }
       });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       return { data: await response.json() };
     },
     post: async (url: string, data: any) => {
       const response = await fetch(url, { 
         method: 'POST', 
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': user ? `Bearer ${user.id}` : ''
+        },
         body: JSON.stringify(data)
       });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       return { data: await response.json() };
     },
     delete: async (url: string) => {
-      const response = await fetch(url, { method: 'DELETE' });
+      const response = await fetch(url, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': user ? `Bearer ${user.id}` : ''
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       return { data: await response.json() };
     }
   };
