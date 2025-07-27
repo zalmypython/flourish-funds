@@ -26,6 +26,7 @@ export default function TaxPrep() {
 
   // Mock data for demonstration
   const [taxForm, setTaxForm] = useState<Partial<TaxFormData>>({
+    id: 'tax-form-2025', // Mock ID for development
     taxYear: currentTaxYear,
     filingStatus: 'single',
     status: 'draft',
@@ -229,6 +230,7 @@ export default function TaxPrep() {
         <TabsContent value="deductions">
           <DeductionsForm 
             data={taxForm.deductionsData}
+            taxFormId={taxForm.id}
             onUpdate={(deductionsData) => setTaxForm(prev => ({ ...prev, deductionsData }))}
           />
         </TabsContent>

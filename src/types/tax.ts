@@ -128,6 +128,7 @@ export interface CharitableContribution {
   amount: number;
   type: 'cash' | 'property';
   dateOfContribution: string;
+  receiptIds?: string[]; // Array of tax document IDs for receipts
 }
 
 export interface Adjustments {

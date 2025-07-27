@@ -33,6 +33,7 @@ import { savingsGoalRoutes } from './routes/savingsGoals';
 import { recurringPaymentRoutes } from './routes/recurringPayments';
 import { stockRoutes } from './routes/stocks';
 import { accountGoalRoutes } from './routes/accountGoals';
+import { taxDocumentRoutes } from './routes/taxDocuments';
 import plaidRoutes from './routes/plaidRoutes';
 
 dotenv.config();
@@ -93,6 +94,7 @@ app.use('/api/stocks', apiLimiter, stockRoutes);
 app.use('/api/account-goals', apiLimiter, accountGoalRoutes);
 app.use('/api/plaid', apiLimiter, plaidRoutes);
 app.use('/api/notifications', apiLimiter, notificationRoutes);
+app.use('/api/tax-forms', apiLimiter, taxDocumentRoutes);
 
 // Error handling
 app.use(errorHandler);

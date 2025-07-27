@@ -6,14 +6,17 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DeductionsData, CharitableContribution } from "@/types/tax";
+import { TaxReceiptUpload } from "./TaxReceiptUpload";
 import { Plus, Trash2, Calculator } from "lucide-react";
 
 interface DeductionsFormProps {
   data?: DeductionsData;
   onUpdate: (data: DeductionsData) => void;
+  taxFormId?: string;
 }
 
-export function DeductionsForm({ data, onUpdate }: DeductionsFormProps) {
+export function DeductionsForm({ data, onUpdate, taxFormId }: DeductionsFormProps) {
+  const [documents, setDocuments] = useState<any[]>([]);
   const [deductionsData, setDeductionsData] = useState<DeductionsData>(data || {
     deductionType: 'standard',
     adjustments: {
@@ -68,7 +71,7 @@ export function DeductionsForm({ data, onUpdate }: DeductionsFormProps) {
     });
   };
 
-  const updateCharitableContribution = (id: string, field: keyof CharitableContribution, value: string | number) => {
+  const updateCharitableContribution = (id: string, field: keyof CharitableContribution, value: string | number | string[]) => {
     if (!deductionsData.itemizedDeductions) return;
     
     const updated = deductionsData.itemizedDeductions.charitableContributions.map(c => 
@@ -81,6 +84,31 @@ export function DeductionsForm({ data, onUpdate }: DeductionsFormProps) {
         charitableContributions: updated
       }
     });
+  };
+
+  const handleDocumentUploaded = (contributionId: string, document: any) => {
+    setDocuments(prev => [...prev, document]);
+    
+    // Link the document to the charitable contribution
+    const contribution = deductionsData.itemizedDeductions?.charitableContributions.find(c => c.id === contributionId);
+    if (contribution) {
+      const receiptIds = contribution.receiptIds || [];
+      updateCharitableContribution(contributionId, 'receiptIds', [...receiptIds, document.id]);
+    }
+  };
+
+  const handleDocumentDeleted = (documentId: string) => {
+    setDocuments(prev => prev.filter(doc => doc.id !== documentId));
+    
+    // Remove document ID from all charitable contributions
+    if (deductionsData.itemizedDeductions?.charitableContributions) {
+      deductionsData.itemizedDeductions.charitableContributions.forEach(contribution => {
+        if (contribution.receiptIds?.includes(documentId)) {
+          const updatedReceiptIds = contribution.receiptIds.filter(id => id !== documentId);
+          updateCharitableContribution(contribution.id, 'receiptIds', updatedReceiptIds);
+        }
+      });
+    }
   };
 
   const standardDeductionAmount = 14600; // 2025 standard deduction for single filers
@@ -287,6 +315,21 @@ export function DeductionsForm({ data, onUpdate }: DeductionsFormProps) {
                           </RadioGroup>
                         </div>
                       </div>
+
+                      {/* Receipt Upload for this contribution */}
+                      {taxFormId && (
+                        <div className="pt-4 border-t">
+                          <TaxReceiptUpload
+                            taxFormId={taxFormId}
+                            onDocumentUploaded={(doc) => handleDocumentUploaded(contribution.id, doc)}
+                            onDocumentDeleted={handleDocumentDeleted}
+                            documents={documents.filter(doc => 
+                              contribution.receiptIds?.includes(doc.id)
+                            )}
+                            className="border-0 p-0"
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                   {(!deductionsData.itemizedDeductions?.charitableContributions || 
