@@ -55,6 +55,8 @@ export interface Transaction extends BaseDocument {
   insurancePolicyId?: string;
   insuranceClaimId?: string;
   insuranceType?: 'premium' | 'claim_payment' | 'deductible' | 'copay' | 'coinsurance';
+  // Income source linking
+  incomeSourceId?: string;
 }
 
 export interface TransactionCategory {
@@ -352,6 +354,67 @@ export interface InsuranceDocument {
   size: number;
   mimeType: string;
 }
+
+// Income Source Types
+export interface PayerRule extends BaseDocument {
+  ruleType: 'exactPayer' | 'partialDescription' | 'amountPattern' | 'accountBased';
+  pattern: string;
+  description?: string;
+  amountRange?: {
+    min: number;
+    max: number;
+  };
+  accountId?: string;
+  isActive: boolean;
+}
+
+export interface IncomeSource extends BaseDocument {
+  name: string;
+  description?: string;
+  type: 'salary' | 'freelance' | 'gig' | 'business' | 'investment' | 'gifts' | 'government' | 'other';
+  employer?: string;
+  expectedMonthlyAmount?: number;
+  isActive: boolean;
+  color: string;
+  icon: string;
+  payerRules: PayerRule[];
+  linkedTransactionIds: string[];
+}
+
+export interface IncomeAnalytics {
+  totalMonthlyIncome: number;
+  incomeBySource: Record<string, number>;
+  monthlyTrend: Array<{
+    month: string;
+    amount: number;
+    sourceId: string;
+  }>;
+  expectedVsActual: Record<string, {
+    expected: number;
+    actual: number;
+    variance: number;
+  }>;
+}
+
+export interface IncomeNotification extends BaseDocument {
+  type: 'uncategorized_income';
+  transactionId: string;
+  title: string;
+  message: string;
+  dismissed: boolean;
+  priority: 'low' | 'medium' | 'high';
+}
+
+export const INCOME_SOURCE_TYPES = [
+  { value: 'salary', label: 'Salary', icon: 'Briefcase', color: '#3b82f6' },
+  { value: 'freelance', label: 'Freelance', icon: 'Laptop', color: '#8b5cf6' },
+  { value: 'gig', label: 'Gig Work', icon: 'Car', color: '#f59e0b' },
+  { value: 'business', label: 'Business', icon: 'Building', color: '#10b981' },
+  { value: 'investment', label: 'Investment', icon: 'TrendingUp', color: '#06b6d4' },
+  { value: 'gifts', label: 'Gifts', icon: 'Gift', color: '#ec4899' },
+  { value: 'government', label: 'Government', icon: 'Landmark', color: '#6b7280' },
+  { value: 'other', label: 'Other', icon: 'DollarSign', color: '#64748b' }
+] as const;
 
 export const DEFAULT_CATEGORIES: TransactionCategory[] = [
   { id: 'food', name: 'Food & Dining', icon: 'UtensilsCrossed', color: '#e74c3c' },

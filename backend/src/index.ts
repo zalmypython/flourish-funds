@@ -36,6 +36,7 @@ import { accountGoalRoutes } from './routes/accountGoals';
 import { taxDocumentRoutes } from './routes/taxDocuments';
 import plaidRoutes from './routes/plaidRoutes';
 import insuranceRoutes from './routes/insurance';
+import incomeSourcesRoutes from './routes/incomeSources';
 
 dotenv.config();
 
@@ -97,6 +98,7 @@ app.use('/api/plaid', apiLimiter, plaidRoutes);
 app.use('/api/notifications', apiLimiter, notificationRoutes);
 app.use('/api/tax-forms', apiLimiter, taxDocumentRoutes);
 app.use('/api/insurance', apiLimiter, insuranceRoutes);
+app.use('/api/income-sources', apiLimiter, incomeSourcesRoutes);
 
 // Error handling
 app.use(errorHandler);
