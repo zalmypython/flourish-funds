@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, Eye } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, PieChart, BarChart3, Eye, Star } from 'lucide-react';
 import { useFirestore } from '../hooks/useFirestore';
 import { useAuth } from '../hooks/useAuth';
 import { stockApi } from '../services/stockApi';
@@ -50,41 +50,108 @@ export const StockPortfolioManager = () => {
     fetchQuotes();
   }, [holdings]);
 
-  // Calculate portfolio summary
-  const portfolio: Portfolio = useMemo(() => {
-    let totalValue = 0;
-    let totalCost = 0;
+  // Calculate portfolio summary with enhanced features
+  const portfolio = useMemo(() => {
+    if (!holdings?.length) {
+      return {
+        totalValue: 0,
+        totalGainLoss: 0,
+        totalGainLossPercent: 0,
+        totalDayChange: 0,
+        totalDayChangePercent: 0,
+        holdings: [],
+        sectorAllocation: {},
+      };
+    }
 
-    const updatedHoldings = holdings.map(holding => {
-      const quote = stockQuotes[holding.stockSymbol];
-      const currentPrice = quote?.price || holding.averageCostBasis;
+    let totalValue = 0;
+    let totalCostBasis = 0;
+    let totalDayChange = 0;
+    const sectorAllocation: Record<string, number> = {};
+
+    // Group holdings by symbol to handle multiple purchases
+    const consolidatedHoldings = holdings.reduce((acc, holding) => {
+      if (!acc[holding.stockSymbol]) {
+        acc[holding.stockSymbol] = {
+          symbol: holding.stockSymbol,
+          name: holding.stockName,
+          shares: 0,
+          totalCost: 0,
+          accountId: holding.accountId, // Use first account for display
+        };
+      }
+      acc[holding.stockSymbol].shares += holding.shares;
+      acc[holding.stockSymbol].totalCost += holding.shares * holding.averageCostBasis;
+      return acc;
+    }, {} as Record<string, any>);
+
+    const holdingsArray = Object.values(consolidatedHoldings).map((holding: any) => {
+      const quote = stockQuotes[holding.symbol];
+      const currentPrice = quote?.price || 0;
       const currentValue = holding.shares * currentPrice;
-      const costBasis = holding.shares * holding.averageCostBasis;
-      
+      const costBasis = holding.totalCost;
+      const averageCostBasis = holding.shares > 0 ? costBasis / holding.shares : 0;
+      const gainLoss = currentValue - costBasis;
+      const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
+      const dayChange = quote ? (holding.shares * quote.change) : 0;
+      const dayChangePercent = quote?.changePercent || 0;
+
+      // Mock sector data (in real app, this would come from stock metadata)
+      const sector = getSectorForSymbol(holding.symbol);
+      if (sector) {
+        sectorAllocation[sector] = (sectorAllocation[sector] || 0) + currentValue;
+      }
+
       totalValue += currentValue;
-      totalCost += costBasis;
+      totalCostBasis += costBasis;
+      totalDayChange += dayChange;
 
       return {
-        ...holding,
+        symbol: holding.symbol,
+        name: holding.name,
+        shares: holding.shares,
+        averageCostBasis,
+        accountId: holding.accountId,
         currentPrice,
         currentValue,
-        gainLoss: currentValue - costBasis,
-        gainLossPercent: ((currentValue - costBasis) / costBasis) * 100,
+        gainLoss,
+        gainLossPercent,
+        dayChange,
+        dayChangePercent,
+        quote,
+        sector,
       };
     });
 
-    const totalGainLoss = totalValue - totalCost;
-    const totalGainLossPercent = totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0;
+    const totalGainLoss = totalValue - totalCostBasis;
+    const totalGainLossPercent = totalCostBasis > 0 ? (totalGainLoss / totalCostBasis) * 100 : 0;
+    const totalDayChangePercent = totalValue > totalDayChange ? (totalDayChange / (totalValue - totalDayChange)) * 100 : 0;
 
     return {
-      holdings: updatedHoldings,
       totalValue,
       totalGainLoss,
       totalGainLossPercent,
-      dailyChange: 0, // Would need historical data for this
-      dailyChangePercent: 0,
+      totalDayChange,
+      totalDayChangePercent,
+      holdings: holdingsArray.sort((a, b) => b.currentValue - a.currentValue), // Sort by value
+      sectorAllocation,
     };
   }, [holdings, stockQuotes]);
+
+  // Helper function to get sector for symbol (mock data)
+  const getSectorForSymbol = (symbol: string): string => {
+    const sectorMap: Record<string, string> = {
+      'AAPL': 'Technology', 'GOOGL': 'Technology', 'MSFT': 'Technology', 'NVDA': 'Technology', 'META': 'Technology',
+      'AMZN': 'Consumer Discretionary', 'TSLA': 'Consumer Discretionary', 'HD': 'Consumer Discretionary', 'MCD': 'Consumer Discretionary', 'NKE': 'Consumer Discretionary',
+      'JPM': 'Financials', 'BAC': 'Financials', 'WFC': 'Financials', 'GS': 'Financials', 'MS': 'Financials', 'C': 'Financials',
+      'JNJ': 'Healthcare', 'PFE': 'Healthcare', 'UNH': 'Healthcare', 'ABBV': 'Healthcare', 'MRK': 'Healthcare', 'TMO': 'Healthcare',
+      'KO': 'Consumer Staples', 'PEP': 'Consumer Staples', 'WMT': 'Consumer Staples',
+      'XOM': 'Energy', 'CVX': 'Energy', 'COP': 'Energy',
+      'BA': 'Industrials', 'CAT': 'Industrials', 'GE': 'Industrials', 'MMM': 'Industrials',
+      'SPY': 'ETF', 'QQQ': 'ETF', 'IWM': 'ETF', 'VTI': 'ETF', 'VOO': 'ETF',
+    };
+    return sectorMap[symbol] || 'Other';
+  };
 
   // Recent transactions
   const recentTransactions = useMemo(() => {
@@ -116,49 +183,66 @@ export const StockPortfolioManager = () => {
 
   return (
     <div className="space-y-6">
-      {/* Portfolio Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Enhanced Portfolio Summary */}
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Portfolio Value</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Portfolio Value</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(portfolio.totalValue)}</div>
-            <p className="text-xs text-muted-foreground">
-              {isLoadingQuotes ? 'Updating...' : 'Real-time value'}
+            <p className={`text-xs flex items-center ${portfolio.totalDayChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {portfolio.totalDayChange >= 0 ? '+' : ''}{formatCurrency(portfolio.totalDayChange)} 
+              <span className="ml-1">({formatPercent(portfolio.totalDayChangePercent)})</span>
             </p>
           </CardContent>
         </Card>
-
+        
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Gain/Loss</CardTitle>
-            {portfolio.totalGainLoss >= 0 ? 
-              <TrendingUp className="h-4 w-4 text-green-600" /> : 
-              <TrendingDown className="h-4 w-4 text-red-600" />
-            }
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${portfolio.totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatCurrency(portfolio.totalGainLoss)}
+              {portfolio.totalGainLoss >= 0 ? '+' : ''}{formatCurrency(portfolio.totalGainLoss)}
             </div>
             <p className={`text-xs ${portfolio.totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {formatPercent(portfolio.totalGainLossPercent)}
             </p>
           </CardContent>
         </Card>
-
+        
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Holdings</CardTitle>
-            <PieChart className="h-4 w-4 text-muted-foreground" />
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{holdings.length}</div>
+            <div className="text-2xl font-bold">{portfolio.holdings.length}</div>
             <p className="text-xs text-muted-foreground">
-              Active positions
+              {Object.keys(portfolio.sectorAllocation).length} sectors
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Top Holding</CardTitle>
+            <Star className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {portfolio.holdings.length > 0 ? (
+              <>
+                <div className="text-2xl font-bold">{portfolio.holdings[0].symbol}</div>
+                <p className="text-xs text-muted-foreground">
+                  {formatCurrency(portfolio.holdings[0].currentValue)}
+                </p>
+              </>
+            ) : (
+              <div className="text-2xl font-bold">-</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -184,7 +268,7 @@ export const StockPortfolioManager = () => {
                 <p className="mt-2 text-muted-foreground">Loading holdings...</p>
               </CardContent>
             </Card>
-          ) : holdings.length === 0 ? (
+          ) : portfolio.holdings.length === 0 ? (
             <Card>
               <CardContent className="p-6 text-center">
                 <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -198,15 +282,18 @@ export const StockPortfolioManager = () => {
           ) : (
             <div className="space-y-4">
               {portfolio.holdings.map((holding: any) => {
-                const quote = stockQuotes[holding.stockSymbol];
+                const quote = stockQuotes[holding.symbol];
                 
                 return (
-                  <Card key={holding.id}>
+                  <Card key={holding.symbol}>
                     <CardContent className="p-6">
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <h3 className="text-lg font-semibold">{holding.stockSymbol}</h3>
-                          <p className="text-sm text-muted-foreground">{holding.stockName}</p>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-semibold">{holding.symbol}</h3>
+                            {holding.sector && <Badge variant="outline" className="text-xs">{holding.sector}</Badge>}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{holding.name}</p>
                         </div>
                         <div className="text-right">
                           <div className="text-lg font-bold">
@@ -233,14 +320,12 @@ export const StockPortfolioManager = () => {
                         </div>
                         <div>
                           <p className="text-muted-foreground">Current Price</p>
-                          <p className="font-medium">
-                            {formatCurrency(holding.currentPrice)}
-                            {quote && (
-                              <span className={`ml-2 ${quote.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                ({formatPercent(quote.changePercent)})
-                              </span>
-                            )}
-                          </p>
+                          <div className="flex flex-col">
+                            <p className="font-medium">{formatCurrency(holding.currentPrice)}</p>
+                            <span className={`text-xs ${holding.dayChangePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {holding.dayChangePercent >= 0 ? '+' : ''}{formatPercent(holding.dayChangePercent)}
+                            </span>
+                          </div>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Total Cost</p>

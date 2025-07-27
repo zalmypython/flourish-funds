@@ -270,13 +270,13 @@ export const StockTransactionForm = ({ onTransactionComplete }: StockTransaction
             </Select>
           </div>
 
-          {/* Stock Search */}
+          {/* Enhanced Stock Search */}
           <div className="space-y-2">
             <Label>Stock Symbol</Label>
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search stocks (e.g., AAPL, GOOGL)"
+                placeholder="Search stocks (e.g., AAPL, Tesla, Microsoft)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -288,48 +288,57 @@ export const StockTransactionForm = ({ onTransactionComplete }: StockTransaction
               )}
             </div>
             
-            {/* Search Results */}
-            {searchResults.length > 0 && (
-              <Card className="max-h-40 overflow-y-auto">
-                <CardContent className="p-2">
-                  {searchResults.map((stock) => (
-                    <button
-                      key={stock.symbol}
-                      type="button"
-                      onClick={() => handleStockSelect(stock)}
-                      className="w-full text-left p-2 hover:bg-muted rounded flex justify-between items-center"
-                    >
+            {/* Enhanced Search Results */}
+            {searchResults.length > 0 && !selectedStock && (
+              <div className="mt-2 border rounded-md max-h-48 overflow-y-auto bg-background">
+                {searchResults.map((stock) => (
+                  <button
+                    key={stock.symbol}
+                    type="button"
+                    onClick={() => handleStockSelect(stock)}
+                    className="w-full text-left p-3 hover:bg-muted border-b last:border-b-0 transition-colors"
+                  >
+                    <div className="flex justify-between items-start">
                       <div>
-                        <div className="font-medium">{stock.symbol}</div>
+                        <div className="font-medium text-foreground">{stock.symbol}</div>
                         <div className="text-sm text-muted-foreground">{stock.name}</div>
                       </div>
-                      <Badge variant="secondary">{stock.type}</Badge>
-                    </button>
-                  ))}
-                </CardContent>
-              </Card>
+                      <Badge variant="secondary" className="text-xs">
+                        {stock.type}
+                      </Badge>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {searchQuery && searchResults.length === 0 && !selectedStock && (
+              <div className="mt-2 p-3 text-sm text-muted-foreground border rounded-md">
+                No stocks found. Try searching for "AAPL", "Tesla", or "Microsoft".
+              </div>
             )}
           </div>
 
-          {/* Current Quote */}
+          {/* Enhanced Current Quote */}
           {selectedStock && currentQuote && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-medium">{selectedStock.symbol}</h3>
-                    <p className="text-sm text-muted-foreground">{selectedStock.name}</p>
+            <div className="p-4 bg-muted rounded-lg border">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-semibold text-foreground">{selectedStock.symbol}</h3>
+                  <p className="text-sm text-muted-foreground">{selectedStock.name}</p>
+                  <Badge variant="outline" className="mt-1 text-xs">{selectedStock.type}</Badge>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-foreground">${currentQuote.price.toFixed(2)}</div>
+                  <div className={`text-sm flex items-center ${currentQuote.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {currentQuote.change >= 0 ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
+                    {currentQuote.change >= 0 ? '+' : ''}{currentQuote.change.toFixed(2)} ({currentQuote.changePercent.toFixed(2)}%)
                   </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold">${currentQuote.price.toFixed(2)}</div>
-                    <div className={`flex items-center text-sm ${currentQuote.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {currentQuote.change >= 0 ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
-                      {currentQuote.change >= 0 ? '+' : ''}{currentQuote.change.toFixed(2)} ({currentQuote.changePercent.toFixed(2)}%)
-                    </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Vol: {currentQuote.volume.toLocaleString()}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
 
           {/* Transaction Details */}
