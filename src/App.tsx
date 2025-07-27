@@ -20,12 +20,28 @@ import Settings from "./pages/Settings";
 import { Transactions } from "./pages/Transactions";
 import { PlaidTransactions } from "./pages/PlaidTransactions";
 import NotFound from "./pages/NotFound";
+import { PerformanceMonitor } from "./components/PerformanceMonitor";
+import { setupGlobalErrorHandling } from "./utils/errorHandler";
+import { logger } from "./utils/logger";
+import React from "react";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
   // Initialize cached balances for existing accounts
   useAccountBalanceInit();
+  
+  React.useEffect(() => {
+    // Set up global error handling
+    setupGlobalErrorHandling();
+    
+    // Log app initialization
+    logger.info('App initialized', {
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    });
+  }, []);
   
   return (
     <Layout>
@@ -59,6 +75,7 @@ const App = () => (
       <BrowserRouter>
         <AppContent />
       </BrowserRouter>
+      <PerformanceMonitor autoRefresh={true} />
     </TooltipProvider>
   </QueryClientProvider>
 );
