@@ -147,17 +147,25 @@ class InsuranceService {
   private shouldLinkTransaction(transaction: any, policy: InsurancePolicy): boolean {
     const { autoLinkingRules } = policy;
     
-    // Check merchant patterns
-    const merchantMatch = autoLinkingRules.merchantPatterns.some(pattern => 
-      transaction.description?.toLowerCase().includes(pattern.toLowerCase()) ||
-      transaction.merchant?.toLowerCase().includes(pattern.toLowerCase())
-    );
+    // Input validation
+    if (!transaction || !autoLinkingRules) return false;
+    
+    // Check merchant patterns with null safety
+    const merchantMatch = autoLinkingRules.merchantPatterns?.some(pattern => 
+      pattern && (
+        transaction.description?.toLowerCase().includes(pattern.toLowerCase()) ||
+        transaction.merchant?.toLowerCase().includes(pattern.toLowerCase())
+      )
+    ) || false;
 
-    // Check amount tolerance for premium payments
-    const amountMatch = Math.abs(transaction.amount - policy.premium) <= autoLinkingRules.amountTolerance;
+    // Check amount tolerance for premium payments with null safety
+    const transactionAmount = parseFloat(transaction.amount) || 0;
+    const policyPremium = parseFloat(policy.premium) || 0;
+    const tolerance = parseFloat(autoLinkingRules.amountTolerance) || 0;
+    const amountMatch = Math.abs(transactionAmount - policyPremium) <= tolerance;
 
-    // Check category filters
-    const categoryMatch = autoLinkingRules.categoryFilters.length === 0 || 
+    // Check category filters with null safety
+    const categoryMatch = !autoLinkingRules.categoryFilters?.length || 
       autoLinkingRules.categoryFilters.includes(transaction.category);
 
     return merchantMatch || (amountMatch && categoryMatch);

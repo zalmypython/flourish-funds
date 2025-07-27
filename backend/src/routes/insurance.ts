@@ -53,6 +53,16 @@ router.put('/policies/:id', auth, async (req, res) => {
 router.post('/policies/:id/link-transaction', auth, async (req, res) => {
   try {
     const { transactionId } = req.body;
+    
+    // Input validation
+    if (!transactionId || typeof transactionId !== 'string') {
+      return res.status(400).json({ error: 'Valid transaction ID is required' });
+    }
+    
+    if (!req.params.id || typeof req.params.id !== 'string') {
+      return res.status(400).json({ error: 'Valid policy ID is required' });
+    }
+    
     const success = await insuranceService.linkTransactionToPolicy(
       req.user.uid,
       req.params.id,

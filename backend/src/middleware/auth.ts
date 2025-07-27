@@ -5,9 +5,10 @@ import { logSuspiciousActivity } from './auditLogger';
 
 export interface AuthRequest extends Request {
   userId?: string;
+  user?: { uid: string; email: string; };
 }
 
-export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const auth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -27,6 +28,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     }
 
     req.userId = decoded.userId;
+    req.user = { uid: decoded.userId, email: decoded.email };
     next();
   } catch (error: any) {
     logSuspiciousActivity(req, 'Token verification failed', { error: error.message });
