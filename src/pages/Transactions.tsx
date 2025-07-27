@@ -4,6 +4,8 @@ import { useFirestore, FirebaseDocument } from '@/hooks/useFirestore';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { useRewardCalculation } from '@/hooks/useRewardCalculation';
 import { useToast } from '@/hooks/use-toast';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { logger } from '@/utils/logger';
 import { Transaction, DEFAULT_CATEGORIES, BankAccount, CreditCard } from '@/types';
 import { AuthModal } from '@/components/AuthModal';
 import { TransferModal } from '@/components/TransferModal';
@@ -46,6 +48,7 @@ export const Transactions = () => {
   const { addTransactionWithBalanceUpdate } = useAccountBalance();
   const { processTransactionRewards } = useRewardCalculation();
   const { toast } = useToast();
+  const { handleError, executeWithErrorHandling } = useErrorHandler('TransactionsPage');
   
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -72,9 +75,12 @@ export const Transactions = () => {
   // Get active budgets for expenses
   const activeBudgets = budgets.filter(budget => budget.status === 'active');
   
-  // Debug logging
-  console.log('All budgets:', budgets);
-  console.log('Active budgets:', activeBudgets);
+  // Log for debugging - replace with proper logging in production
+  logger.debug('Budget data loaded', {
+    totalBudgets: budgets.length,
+    activeBudgets: activeBudgets.length,
+    budgetNames: activeBudgets.map(b => b.name)
+  });
 
   if (!user) {
     return <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />;
@@ -95,6 +101,12 @@ export const Transactions = () => {
 
   const handleAddTransaction = async () => {
     if (!formData.amount || !formData.description || !formData.accountId) {
+      logger.warn('Transaction creation attempted with missing fields', {
+        hasAmount: !!formData.amount,
+        hasDescription: !!formData.description,
+        hasAccountId: !!formData.accountId
+      });
+      
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields.",
@@ -105,6 +117,8 @@ export const Transactions = () => {
     
     // For expenses, check if budget is selected
     if (formData.type === 'expense' && !formData.budgetId) {
+      logger.warn('Expense transaction attempted without budget selection');
+      
       toast({
         title: "Budget Required",
         description: "Please select a budget for expense transactions.",
@@ -113,7 +127,7 @@ export const Transactions = () => {
       return;
     }
 
-    try {
+    const result = await executeWithErrorHandling(async () => {
       // For expenses, use budget's category. For income, use 'income' category
       const category = formData.type === 'expense' && formData.budgetId
         ? budgets.find(b => b.id === formData.budgetId)?.category || 'other'
@@ -131,12 +145,24 @@ export const Transactions = () => {
         status: formData.status
       };
 
+      logger.info('Creating new transaction', {
+        type: formData.type,
+        amount: parseFloat(formData.amount),
+        category,
+        accountType: formData.accountType
+      });
+
       const newTransaction = await addTransactionWithBalanceUpdate(newTransactionData);
 
       // Process rewards if this is a credit card transaction
       if (formData.accountType === 'credit' && formData.type === 'expense') {
         const creditCard = creditCards.find(card => card.id === formData.accountId);
         if (creditCard) {
+          logger.info('Processing credit card rewards', {
+            cardId: formData.accountId,
+            amount: parseFloat(formData.amount)
+          });
+          
           // Create transaction object with generated ID for reward calculation
           const transactionForRewards = { 
             ...newTransactionData, 
@@ -163,18 +189,17 @@ export const Transactions = () => {
       
       setIsAddDialogOpen(false);
       
+      logger.info('Transaction created successfully');
+      
       toast({
         title: "Success",
         description: "Transaction added successfully!",
       });
-    } catch (error) {
-      console.error('Failed to add transaction:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add transaction. Please try again.",
-        variant: "destructive"
-      });
-    }
+
+      return newTransaction;
+    }, { action: 'add_transaction', additionalData: { type: formData.type, amount: formData.amount } });
+
+    return result;
   };
 
   const handleEditTransaction = (transaction: Transaction) => {
@@ -183,41 +208,75 @@ export const Transactions = () => {
   };
 
   const handleUpdateTransaction = async (transactionId: string, data: Partial<Transaction>) => {
-    try {
+    const result = await executeWithErrorHandling(async () => {
+      logger.info('Updating transaction', {
+        transactionId,
+        updateFields: Object.keys(data)
+      });
+
       await updateDocument(transactionId, data);
       setShowEditDialog(false);
       setEditingTransaction(null);
+      
+      logger.info('Transaction updated successfully', { transactionId });
       
       toast({
         title: "Transaction updated",
         description: "Transaction has been updated successfully",
       });
-    } catch (error) {
-      toast({
-        title: "Update failed",
-        description: "Failed to update transaction. Please try again.",
-        variant: "destructive",
-      });
-    }
+    }, { action: 'update_transaction', additionalData: { transactionId } });
+
+    return result;
   };
 
   const handleUploadDocument = async (transactionId: string, file: File, source: 'camera' | 'files' | 'drag-drop') => {
-    const validation = transactionDocumentService.validateFile(file);
-    if (!validation.valid) {
-      throw new Error(validation.error);
-    }
+    return await executeWithErrorHandling(async () => {
+      logger.info('Starting document upload', {
+        transactionId,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        source
+      });
 
-    // Compress image if it's an image file
-    let fileToUpload = file;
-    if (file.type.startsWith('image/')) {
-      fileToUpload = await transactionDocumentService.compressImage(file);
-    }
+      const validation = transactionDocumentService.validateFile(file);
+      if (!validation.valid) {
+        logger.warn('File validation failed', {
+          fileName: file.name,
+          error: validation.error
+        });
+        throw new Error(validation.error);
+      }
 
-    return await transactionDocumentService.uploadDocument(transactionId, fileToUpload, source);
+      // Compress image if it's an image file
+      let fileToUpload = file;
+      if (file.type.startsWith('image/')) {
+        logger.info('Compressing image file', { fileName: file.name });
+        fileToUpload = await transactionDocumentService.compressImage(file);
+        logger.info('Image compression completed', {
+          originalSize: file.size,
+          compressedSize: fileToUpload.size,
+          compressionRatio: ((file.size - fileToUpload.size) / file.size * 100).toFixed(1) + '%'
+        });
+      }
+
+      const result = await transactionDocumentService.uploadDocument(transactionId, fileToUpload, source);
+      
+      logger.info('Document upload completed', {
+        transactionId,
+        documentId: result.id
+      });
+
+      return result;
+    }, { action: 'upload_document', additionalData: { transactionId, source } });
   };
 
   const handleDeleteDocument = async (transactionId: string, documentId: string) => {
-    await transactionDocumentService.deleteDocument(transactionId, documentId);
+    return await executeWithErrorHandling(async () => {
+      logger.info('Deleting document', { transactionId, documentId });
+      await transactionDocumentService.deleteDocument(transactionId, documentId);
+      logger.info('Document deleted successfully', { transactionId, documentId });
+    }, { action: 'delete_document', additionalData: { transactionId, documentId } });
   };
 
   const filteredTransactions = transactions.filter(transaction => {

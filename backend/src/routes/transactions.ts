@@ -281,10 +281,42 @@ router.post('/:id/documents',
   async (req: AuthRequest, res, next) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
+        return res.status(400).json({ 
+          error: 'No file uploaded',
+          code: 'NO_FILE'
+        });
       }
 
+      // Additional security validation
+      if (!req.userId) {
+        return res.status(401).json({ 
+          error: 'User authentication required',
+          code: 'UNAUTHORIZED'
+        });
+      }
+
+      // Log upload attempt for security monitoring
+      console.log('DOCUMENT_UPLOAD_ATTEMPT:', JSON.stringify({
+        timestamp: new Date().toISOString(),
+        userId: req.userId,
+        transactionId: req.params.id,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      }));
+
       const { source = 'files' } = req.body;
+      
+      // Validate source parameter
+      const validSources = ['camera', 'files', 'drag-drop'];
+      if (!validSources.includes(source)) {
+        return res.status(400).json({
+          error: 'Invalid source parameter',
+          code: 'INVALID_SOURCE'
+        });
+      }
       
       const document = await documentService.uploadDocument(
         req.params.id,
@@ -293,14 +325,35 @@ router.post('/:id/documents',
         source as 'camera' | 'files' | 'drag-drop'
       );
 
+      // Log successful upload
+      console.log('DOCUMENT_UPLOAD_SUCCESS:', JSON.stringify({
+        timestamp: new Date().toISOString(),
+        userId: req.userId,
+        transactionId: req.params.id,
+        documentId: document.id,
+        fileName: document.originalName,
+        fileSize: document.fileSize
+      }));
+
       res.status(201).json({ 
         message: 'Document uploaded successfully',
         document 
       });
     } catch (error: any) {
+      // Enhanced error logging
+      console.error('DOCUMENT_UPLOAD_ERROR:', JSON.stringify({
+        timestamp: new Date().toISOString(),
+        userId: req.userId,
+        transactionId: req.params.id,
+        error: error.message,
+        stack: error.stack,
+        ip: req.ip
+      }));
+
       // Clean up uploaded file if processing failed
       if (req.file && fs.existsSync(req.file.path)) {
         fs.unlinkSync(req.file.path);
+        console.log('Cleaned up failed upload file:', req.file.path);
       }
       next(error);
     }
@@ -310,13 +363,28 @@ router.post('/:id/documents',
 // Get documents for transaction
 router.get('/:id/documents', authenticateToken, async (req: AuthRequest, res, next) => {
   try {
+    // Log document access for audit
+    console.log('DOCUMENT_ACCESS_ATTEMPT:', JSON.stringify({
+      timestamp: new Date().toISOString(),
+      userId: req.userId,
+      transactionId: req.params.id,
+      action: 'list_documents',
+      ip: req.ip
+    }));
+
     const documents = await documentService.getTransactionDocuments(
       req.params.id, 
       req.userId!
     );
     
     res.json({ documents });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('DOCUMENT_ACCESS_ERROR:', JSON.stringify({
+      timestamp: new Date().toISOString(),
+      userId: req.userId,
+      transactionId: req.params.id,
+      error: error.message
+    }));
     next(error);
   }
 });
@@ -324,19 +392,56 @@ router.get('/:id/documents', authenticateToken, async (req: AuthRequest, res, ne
 // Download document
 router.get('/:id/documents/:docId/download', authenticateToken, async (req: AuthRequest, res, next) => {
   try {
+    // Enhanced security logging for file downloads
+    console.log('DOCUMENT_DOWNLOAD_ATTEMPT:', JSON.stringify({
+      timestamp: new Date().toISOString(),
+      userId: req.userId,
+      transactionId: req.params.id,
+      documentId: req.params.docId,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      referer: req.get('Referer')
+    }));
+
     const { filePath, filename } = await documentService.downloadDocument(
       req.params.id,
       req.params.docId,
       req.userId!
     );
 
+    // Set security headers for download
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    
     res.download(filePath, filename, (err) => {
       if (err) {
-        console.error('Download error:', err);
+        console.error('DOCUMENT_DOWNLOAD_ERROR:', JSON.stringify({
+          timestamp: new Date().toISOString(),
+          userId: req.userId,
+          transactionId: req.params.id,
+          documentId: req.params.docId,
+          error: err.message
+        }));
         next(err);
+      } else {
+        // Log successful download
+        console.log('DOCUMENT_DOWNLOAD_SUCCESS:', JSON.stringify({
+          timestamp: new Date().toISOString(),
+          userId: req.userId,
+          transactionId: req.params.id,
+          documentId: req.params.docId,
+          filename
+        }));
       }
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('DOCUMENT_DOWNLOAD_ERROR:', JSON.stringify({
+      timestamp: new Date().toISOString(),
+      userId: req.userId,
+      transactionId: req.params.id,
+      documentId: req.params.docId,
+      error: error.message
+    }));
     next(error);
   }
 });
@@ -344,14 +449,42 @@ router.get('/:id/documents/:docId/download', authenticateToken, async (req: Auth
 // Delete document
 router.delete('/:id/documents/:docId', authenticateToken, async (req: AuthRequest, res, next) => {
   try {
+    // Critical security logging for deletions
+    console.log('DOCUMENT_DELETE_ATTEMPT:', JSON.stringify({
+      timestamp: new Date().toISOString(),
+      userId: req.userId,
+      transactionId: req.params.id,
+      documentId: req.params.docId,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+      severity: 'HIGH'
+    }));
+
     await documentService.deleteDocument(
       req.params.id,
       req.params.docId,
       req.userId!
     );
     
+    // Log successful deletion
+    console.log('DOCUMENT_DELETE_SUCCESS:', JSON.stringify({
+      timestamp: new Date().toISOString(),
+      userId: req.userId,
+      transactionId: req.params.id,
+      documentId: req.params.docId,
+      severity: 'HIGH'
+    }));
+    
     res.json({ message: 'Document deleted successfully' });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('DOCUMENT_DELETE_ERROR:', JSON.stringify({
+      timestamp: new Date().toISOString(),
+      userId: req.userId,
+      transactionId: req.params.id,
+      documentId: req.params.docId,
+      error: error.message,
+      severity: 'HIGH'
+    }));
     next(error);
   }
 });
