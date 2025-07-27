@@ -31,7 +31,9 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { Transaction, TransactionDocument, DEFAULT_CATEGORIES } from '@/types';
+import { logger } from '@/utils/logger';
 import { DocumentUploadArea } from './DocumentUploadArea';
 import {
   Camera,
@@ -75,6 +77,7 @@ export function EditTransactionDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { handleError, executeWithErrorHandling } = useErrorHandler('EditTransactionDialog');
 
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionSchema),
@@ -88,10 +91,21 @@ export function EditTransactionDialog({
   });
 
   const handleFileUpload = useCallback(async (files: FileList, source: 'camera' | 'files' | 'drag-drop') => {
-    if (!transaction) return;
+    if (!transaction) {
+      logger.warn('File upload attempted without transaction context');
+      return;
+    }
 
     setIsUploading(true);
-    try {
+    
+    const result = await executeWithErrorHandling(async () => {
+      logger.info('Starting file upload', {
+        transactionId: transaction.id,
+        fileCount: files.length,
+        source,
+        files: Array.from(files).map(f => ({ name: f.name, size: f.size, type: f.type }))
+      });
+
       const uploadPromises = Array.from(files).map(file => 
         onUploadDocument(transaction.id, file, source)
       );
@@ -99,20 +113,23 @@ export function EditTransactionDialog({
       const newDocuments = await Promise.all(uploadPromises);
       setDocuments(prev => [...prev, ...newDocuments]);
       
+      logger.info('File upload completed successfully', {
+        transactionId: transaction.id,
+        uploadedCount: newDocuments.length,
+        source
+      });
+      
       toast({
         title: 'Documents uploaded',
         description: `${newDocuments.length} document(s) uploaded successfully`,
       });
-    } catch (error) {
-      toast({
-        title: 'Upload failed',
-        description: 'Failed to upload documents. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  }, [transaction, onUploadDocument, toast]);
+
+      return newDocuments;
+    }, { action: 'upload_documents', additionalData: { source } });
+
+    setIsUploading(false);
+    return result;
+  }, [transaction, onUploadDocument, toast, executeWithErrorHandling]);
 
   const handleCameraCapture = () => {
     if (cameraInputRef.current) {
@@ -127,32 +144,53 @@ export function EditTransactionDialog({
   };
 
   const handleDeleteDocument = async (documentId: string) => {
-    if (!transaction) return;
+    if (!transaction) {
+      logger.warn('Document deletion attempted without transaction context');
+      return;
+    }
 
-    try {
+    const result = await executeWithErrorHandling(async () => {
+      logger.info('Starting document deletion', {
+        transactionId: transaction.id,
+        documentId
+      });
+
       await onDeleteDocument(transaction.id, documentId);
       setDocuments(prev => prev.filter(doc => doc.id !== documentId));
+      
+      logger.info('Document deleted successfully', {
+        transactionId: transaction.id,
+        documentId
+      });
       
       toast({
         title: 'Document deleted',
         description: 'Document was removed successfully',
       });
-    } catch (error) {
-      toast({
-        title: 'Delete failed',
-        description: 'Failed to delete document. Please try again.',
-        variant: 'destructive',
-      });
-    }
+    }, { action: 'delete_document', additionalData: { documentId } });
+
+    return result;
   };
 
   const onSubmit = async (data: TransactionFormData) => {
-    if (!transaction) return;
+    if (!transaction) {
+      logger.warn('Transaction update attempted without transaction context');
+      return;
+    }
 
-    try {
+    const result = await executeWithErrorHandling(async () => {
+      logger.info('Starting transaction update', {
+        transactionId: transaction.id,
+        updateData: { ...data, documentCount: documents.length }
+      });
+
       await onUpdate(transaction.id, {
         ...data,
         documents,
+      });
+      
+      logger.info('Transaction updated successfully', {
+        transactionId: transaction.id
       });
       
       toast({
@@ -161,13 +199,9 @@ export function EditTransactionDialog({
       });
       
       onOpenChange(false);
-    } catch (error) {
-      toast({
-        title: 'Update failed',
-        description: 'Failed to update transaction. Please try again.',
-        variant: 'destructive',
-      });
-    }
+    }, { action: 'update_transaction' });
+
+    return result;
   };
 
   if (!transaction) return null;

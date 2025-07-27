@@ -146,22 +146,38 @@ export class DocumentService {
     action: 'upload' | 'access' | 'download' | 'delete',
     userId: string,
     transactionId: string,
-    documentId?: string
+    documentId?: string,
+    metadata?: any
   ): Promise<void> {
-    // Audit logging
+    // Enhanced audit logging with more security context
     const logEntry = {
       timestamp: new Date().toISOString(),
       action,
       userId,
       transactionId,
       documentId: documentId || null,
-      userAgent: 'backend-service' // Would get from request in real implementation
+      metadata: metadata || {},
+      sessionId: `session-${Date.now()}`, // Would be real session ID
+      userAgent: 'backend-service', // Would get from request
+      severity: action === 'delete' ? 'HIGH' : 'MEDIUM'
     };
 
-    console.log('AUDIT_LOG:', JSON.stringify(logEntry));
+    // Log to console (in production, this would go to secure audit system)
+    console.log('DOCUMENT_AUDIT_LOG:', JSON.stringify(logEntry));
     
-    // In production, this would write to a secure audit log service
-    // or database with tamper-proof logging
+    // Additional security logging for sensitive operations
+    if (action === 'delete' || action === 'download') {
+      console.log('SECURITY_LOG:', JSON.stringify({
+        ...logEntry,
+        alertType: 'SENSITIVE_DOCUMENT_OPERATION',
+        requiresReview: true
+      }));
+    }
+    
+    // In production, this would write to:
+    // - Secure audit log service with immutable records
+    // - SIEM system for security monitoring
+    // - Compliance logging for financial regulations
   }
 
   // Cleanup method for removing orphaned files

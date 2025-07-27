@@ -57,21 +57,48 @@ export const uploadDocument = multer({
 
 // Error handling middleware for multer
 export const handleUploadError = (error: any, req: any, res: any, next: any) => {
+  // Log all upload errors for security monitoring
+  console.log('UPLOAD_ERROR:', JSON.stringify({
+    timestamp: new Date().toISOString(),
+    userId: req.userId,
+    error: error.message,
+    code: error.code,
+    ip: req.ip,
+    userAgent: req.get('User-Agent')
+  }));
+
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File too large. Maximum size is 10MB.' });
+      return res.status(400).json({ 
+        error: 'File too large. Maximum size is 10MB.',
+        code: 'FILE_TOO_LARGE'
+      });
     }
     if (error.code === 'LIMIT_FILE_COUNT') {
-      return res.status(400).json({ error: 'Too many files. Maximum 10 files allowed.' });
+      return res.status(400).json({ 
+        error: 'Too many files. Maximum 10 files allowed.',
+        code: 'TOO_MANY_FILES'
+      });
     }
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {
-      return res.status(400).json({ error: 'Unexpected file field.' });
+      return res.status(400).json({ 
+        error: 'Unexpected file field.',
+        code: 'UNEXPECTED_FILE'
+      });
     }
   }
   
   if (error.message.includes('Invalid file type')) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({ 
+      error: error.message,
+      code: 'INVALID_FILE_TYPE'
+    });
   }
   
-  next(error);
+  // Log unknown upload errors
+  console.error('Unknown upload error:', error);
+  res.status(500).json({ 
+    error: 'Upload failed. Please try again.',
+    code: 'UPLOAD_ERROR'
+  });
 };
