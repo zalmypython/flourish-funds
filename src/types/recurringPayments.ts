@@ -1,4 +1,4 @@
-import { FirebaseDocument } from '@/hooks/useFirestore';
+import { BaseDocument } from '@/types';
 
 export type FrequencyType = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
 
@@ -14,7 +14,7 @@ export interface FrequencyConfig {
   customDescription?: string; // e.g., "Every 2nd and 4th Friday"
 }
 
-export interface RecurringPayment extends FirebaseDocument {
+export interface RecurringPayment extends BaseDocument {
   name: string;
   amount: number;
   frequency: FrequencyConfig | string; // Support both new and legacy formats

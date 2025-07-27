@@ -1,6 +1,11 @@
-import { FirebaseDocument } from '@/hooks/useFirestore';
+export interface BaseDocument {
+  id: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export interface Transaction extends FirebaseDocument {
+export interface Transaction extends BaseDocument {
   date: string;
   amount: number;
   description: string;
@@ -64,7 +69,7 @@ export interface AccountBonus {
   requirementType: 'balance' | 'transactions' | 'direct_deposit' | 'spending';
 }
 
-export interface BankAccount extends FirebaseDocument {
+export interface BankAccount extends BaseDocument {
   name: string;
   type: string;
   initialBalance: number;
@@ -138,7 +143,7 @@ export interface CreditCardGoal {
   priority: 'low' | 'medium' | 'high';
 }
 
-export interface CreditCard extends FirebaseDocument {
+export interface CreditCard extends BaseDocument {
   name: string;
   issuer: string;
   type: string;
@@ -208,7 +213,7 @@ export interface Stock {
   changePercent?: number;
 }
 
-export interface StockHolding extends FirebaseDocument {
+export interface StockHolding extends BaseDocument {
   stockSymbol: string;
   stockName: string;
   shares: number;
@@ -217,7 +222,7 @@ export interface StockHolding extends FirebaseDocument {
   accountId: string; // Bank account used for purchases
 }
 
-export interface StockTransaction extends FirebaseDocument {
+export interface StockTransaction extends BaseDocument {
   type: 'buy' | 'sell';
   stockSymbol: string;
   stockName: string;

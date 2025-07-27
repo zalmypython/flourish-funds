@@ -1,32 +1,38 @@
 import { useState, useEffect } from 'react';
-import { 
-  User,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-} from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import apiClient from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 
-export const useAuth = () => {
+export interface User {
+  id: string;
+  email: string;
+}
+
+export const useApiAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    // Check for stored user and token
+    const storedUser = localStorage.getItem('user');
+    const storedToken = localStorage.getItem('authToken');
+    
+    if (storedUser && storedToken) {
+      setUser(JSON.parse(storedUser));
+    }
+    setLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
       setLoading(true);
-      await signInWithEmailAndPassword(auth, email, password);
+      const response = await apiClient.post('/auth/login', { email, password });
+      const { user, token } = response.data;
+      
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('authToken', token);
+      setUser(user);
+      
       toast({
         title: "Success",
         description: "Successfully logged in!"
@@ -34,7 +40,7 @@ export const useAuth = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.response?.data?.error || "Login failed",
         variant: "destructive"
       });
     } finally {
@@ -45,7 +51,13 @@ export const useAuth = () => {
   const signup = async (email: string, password: string) => {
     try {
       setLoading(true);
-      await createUserWithEmailAndPassword(auth, email, password);
+      const response = await apiClient.post('/auth/register', { email, password });
+      const { user, token } = response.data;
+      
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('authToken', token);
+      setUser(user);
+      
       toast({
         title: "Success",
         description: "Account created successfully!"
@@ -53,7 +65,7 @@ export const useAuth = () => {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message,
+        description: error.response?.data?.error || "Registration failed",
         variant: "destructive"
       });
     } finally {
@@ -63,7 +75,10 @@ export const useAuth = () => {
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      localStorage.removeItem('user');
+      localStorage.removeItem('authToken');
+      setUser(null);
+      
       toast({
         title: "Success",
         description: "Successfully logged out!"
