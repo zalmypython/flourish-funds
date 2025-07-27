@@ -11,6 +11,12 @@ import {
   requestSizeLimiter 
 } from './middleware/security';
 import { auditApiAccess } from './middleware/auditLogger';
+import { 
+  xssProtection, 
+  enhancedCSP, 
+  outputEncoding, 
+  xssAuditLogger 
+} from './middleware/xssProtection';
 import { authRoutes } from './routes/auth';
 import { bankAccountRoutes } from './routes/bankAccounts';
 import { creditCardRoutes } from './routes/creditCards';
@@ -29,23 +35,27 @@ const PORT = process.env.PORT || 3000;
 // Initialize Firebase
 initializeFirebase();
 
-// Security middleware (applied first)
+// Enhanced security middleware stack
+app.use(enhancedCSP);
 app.use(securityHeaders);
 app.use(requestSizeLimiter);
 app.use(speedLimiter);
+app.use(xssAuditLogger);
 
 // CORS configuration
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:8080',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Device-Fingerprint'],
   exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining']
 }));
 
-// Body parsing with size limits
+// Body parsing with size limits and XSS protection
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(xssProtection({ detectOnly: false, logThreats: true, blockCritical: true }));
+app.use(outputEncoding);
 
 // Audit logging for all API requests
 app.use('/api', auditApiAccess);

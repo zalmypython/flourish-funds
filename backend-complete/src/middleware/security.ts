@@ -34,17 +34,24 @@ export const speedLimiter = slowDown({
   maxDelayMs: 5000, // Maximum delay of 5 seconds
 });
 
-// Security headers configuration
+// Enhanced security headers configuration with stricter CSP
 export const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      scriptSrc: ["'self'"],
       connectSrc: ["'self'", process.env.FRONTEND_URL || "http://localhost:8080"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      upgradeInsecureRequests: [],
     },
+    reportOnly: false,
   },
   hsts: {
     maxAge: 31536000, // 1 year
@@ -53,7 +60,10 @@ export const securityHeaders = helmet({
   },
   noSniff: true,
   xssFilter: true,
-  referrerPolicy: { policy: "same-origin" }
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  crossOriginEmbedderPolicy: false, // Disable for compatibility
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 });
 
 // Input validation schemas
