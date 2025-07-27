@@ -6,6 +6,7 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Search, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { stockApi } from '../services/stockApi';
 import { useFirestore } from '../hooks/useFirestore';
@@ -53,7 +54,9 @@ export const StockTransactionForm = ({ onTransactionComplete }: StockTransaction
 
   const [formData, setFormData] = useState({
     type: 'buy' as 'buy' | 'sell',
+    inputMode: 'shares' as 'shares' | 'amount',
     shares: '',
+    investmentAmount: '',
     price: '',
     fees: '0',
     accountId: '',
@@ -119,10 +122,25 @@ export const StockTransactionForm = ({ onTransactionComplete }: StockTransaction
     setSearchResults([]);
   };
 
+  const calculateShares = () => {
+    if (formData.inputMode === 'amount' && formData.investmentAmount && formData.price) {
+      const amount = parseFloat(formData.investmentAmount) || 0;
+      const price = parseFloat(formData.price) || 0;
+      const fees = parseFloat(formData.fees) || 0;
+      return price > 0 ? (amount - fees) / price : 0;
+    }
+    return parseFloat(formData.shares) || 0;
+  };
+
   const calculateTotal = () => {
-    const shares = parseFloat(formData.shares) || 0;
+    const shares = calculateShares();
     const price = parseFloat(formData.price) || 0;
     const fees = parseFloat(formData.fees) || 0;
+    
+    if (formData.inputMode === 'amount' && formData.investmentAmount) {
+      return parseFloat(formData.investmentAmount) || 0;
+    }
+    
     return shares * price + fees;
   };
 
@@ -131,15 +149,43 @@ export const StockTransactionForm = ({ onTransactionComplete }: StockTransaction
     
     if (!user || !selectedStock) return;
 
-    const shares = parseFloat(formData.shares);
+    const shares = calculateShares();
     const price = parseFloat(formData.price);
     const fees = parseFloat(formData.fees) || 0;
     const totalAmount = calculateTotal();
 
-    if (!shares || !price || !formData.accountId) {
+    // Validation
+    if (!price || !formData.accountId) {
       toast({
         title: "Invalid Input",
         description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formData.inputMode === 'shares' && !shares) {
+      toast({
+        title: "Invalid Input",
+        description: "Please enter the number of shares.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formData.inputMode === 'amount' && !formData.investmentAmount) {
+      toast({
+        title: "Invalid Input",
+        description: "Please enter the investment amount.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (shares <= 0) {
+      toast({
+        title: "Invalid Input",
+        description: "Investment amount too small to purchase any shares.",
         variant: "destructive"
       });
       return;
@@ -221,7 +267,9 @@ export const StockTransactionForm = ({ onTransactionComplete }: StockTransaction
       // Reset form
       setFormData({
         type: 'buy',
+        inputMode: 'shares',
         shares: '',
+        investmentAmount: '',
         price: '',
         fees: '0',
         accountId: '',
@@ -341,21 +389,63 @@ export const StockTransactionForm = ({ onTransactionComplete }: StockTransaction
             </div>
           )}
 
-          {/* Transaction Details */}
+          {/* Investment Input Mode Selection */}
           {selectedStock && (
             <>
+              <div className="space-y-3">
+                <Label>Investment Method</Label>
+                <RadioGroup 
+                  value={formData.inputMode} 
+                  onValueChange={(value: 'shares' | 'amount') => setFormData(prev => ({ ...prev, inputMode: value }))}
+                  className="flex space-x-6"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="shares" id="shares-mode" />
+                    <Label htmlFor="shares-mode">Number of Shares</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="amount" id="amount-mode" />
+                    <Label htmlFor="amount-mode">Dollar Amount</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Transaction Details */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="shares">Shares</Label>
-                  <Input
-                    id="shares"
-                    type="number"
-                    step="0.01"
-                    value={formData.shares}
-                    onChange={(e) => setFormData(prev => ({ ...prev, shares: e.target.value }))}
-                    placeholder="0"
-                  />
-                </div>
+                {formData.inputMode === 'shares' ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="shares">Shares</Label>
+                    <Input
+                      id="shares"
+                      type="number"
+                      step="0.01"
+                      value={formData.shares}
+                      onChange={(e) => setFormData(prev => ({ ...prev, shares: e.target.value }))}
+                      placeholder="0"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Investment Amount</Label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="amount"
+                        type="number"
+                        step="0.01"
+                        value={formData.investmentAmount}
+                        onChange={(e) => setFormData(prev => ({ ...prev, investmentAmount: e.target.value }))}
+                        placeholder="0.00"
+                        className="pl-9"
+                      />
+                    </div>
+                    {formData.investmentAmount && formData.price && (
+                      <p className="text-sm text-muted-foreground">
+                        ≈ {calculateShares().toFixed(4)} shares
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="price">Price per Share</Label>
                   <Input
@@ -419,7 +509,12 @@ export const StockTransactionForm = ({ onTransactionComplete }: StockTransaction
                 <Button 
                   type="submit" 
                   className="flex-1"
-                  disabled={!formData.shares || !formData.price || !formData.accountId}
+                  disabled={
+                    !formData.price || 
+                    !formData.accountId || 
+                    (formData.inputMode === 'shares' && !formData.shares) ||
+                    (formData.inputMode === 'amount' && !formData.investmentAmount)
+                  }
                 >
                   {formData.type === 'buy' ? 'Buy' : 'Sell'} Stock
                 </Button>
