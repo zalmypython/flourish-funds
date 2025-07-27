@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { DEFAULT_CATEGORIES, Transaction } from '@/types';
+import { IncomeNotificationPrompt } from './IncomeNotificationPrompt';
 
 interface EnhancedTransactionListProps {
   transactions: Transaction[];
@@ -26,6 +27,7 @@ export function EnhancedTransactionList({
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedAccount, setSelectedAccount] = useState('all');
   const [dateRange, setDateRange] = useState('all');
+  const [incomeNotificationTransaction, setIncomeNotificationTransaction] = useState<Transaction | null>(null);
 
   // Enhanced filtering
   const filteredTransactions = transactions.filter(transaction => {
@@ -259,21 +261,43 @@ export function EnhancedTransactionList({
                         </Button>
                       )}
                       
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => onDelete(transaction.id)}
-                        title="Delete transaction"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+                       <Button 
+                         variant="ghost" 
+                         size="sm"
+                         onClick={() => onDelete(transaction.id)}
+                         title="Delete transaction"
+                       >
+                         <Trash2 className="h-4 w-4" />
+                       </Button>
+                       
+                       {/* Income notification trigger */}
+                       {transaction.type === 'income' && (
+                         <Button 
+                           variant="ghost" 
+                           size="sm"
+                           onClick={() => setIncomeNotificationTransaction(transaction)}
+                           title="Categorize income"
+                         >
+                           💰
+                         </Button>
+                       )}
+                     </div>
+                   </div>
+                 ))
+             )}
+           </div>
+         </CardContent>
+       </Card>
+
+       {/* Income Notification Prompt */}
+       {incomeNotificationTransaction && (
+         <IncomeNotificationPrompt
+           open={!!incomeNotificationTransaction}
+           onOpenChange={() => setIncomeNotificationTransaction(null)}
+           transaction={incomeNotificationTransaction}
+           onComplete={() => setIncomeNotificationTransaction(null)}
+         />
+       )}
+     </div>
+   );
+ }

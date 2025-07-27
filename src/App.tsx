@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import { useAccountBalanceInit } from "@/hooks/useAccountBalanceInit";
+import { IncomeNotificationSystem } from "./components/IncomeNotificationSystem";
 import Dashboard from "./pages/Dashboard";
 import BankAccounts from "./pages/BankAccounts";
 import BankAccountDetail from "./pages/BankAccountDetail";
@@ -46,28 +47,30 @@ const AppContent = () => {
   }, []);
   
   return (
-    <Layout>
-      <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/accounts" element={<BankAccounts />} />
-            <Route path="/accounts/:accountId" element={<BankAccountDetail />} />
-            <Route path="/credit-cards" element={<CreditCards />} />
-            <Route path="/credit-cards/:cardId" element={<CreditCardDetail />} />
-            <Route path="/budgets" element={<Budgets />} />
-            <Route path="/goals" element={<SavingsGoals />} />
-            <Route path="/portfolio" element={<Portfolio />} />
-            <Route path="/net-worth" element={<NetWorth />} />
-            <Route path="/transactions" element={<PlaidTransactions />} />
-            <Route path="/transactions-manual" element={<Transactions />} />
-            <Route path="/recurring" element={<RecurringPayments />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/tax-prep" element={<TaxPrep />} />
-            <Route path="/income-sources" element={<IncomeSources />} />
-            <Route path="/settings" element={<Settings />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Layout>
+    <IncomeNotificationSystem>
+      <Layout>
+        <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/accounts" element={<BankAccounts />} />
+              <Route path="/accounts/:accountId" element={<BankAccountDetail />} />
+              <Route path="/credit-cards" element={<CreditCards />} />
+              <Route path="/credit-cards/:cardId" element={<CreditCardDetail />} />
+              <Route path="/budgets" element={<Budgets />} />
+              <Route path="/goals" element={<SavingsGoals />} />
+              <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/net-worth" element={<NetWorth />} />
+              <Route path="/transactions" element={<PlaidTransactions />} />
+              <Route path="/transactions-manual" element={<Transactions />} />
+              <Route path="/recurring" element={<RecurringPayments />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/tax-prep" element={<TaxPrep />} />
+              <Route path="/income-sources" element={<IncomeSources />} />
+              <Route path="/settings" element={<Settings />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Layout>
+        </IncomeNotificationSystem>
   );
 };
 
