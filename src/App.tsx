@@ -17,6 +17,7 @@ import NetWorth from "./pages/NetWorth";
 import RecurringPayments from "./pages/RecurringPayments";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import TaxPrep from "./pages/TaxPrep";
 import { Transactions } from "./pages/Transactions";
 import { PlaidTransactions } from "./pages/PlaidTransactions";
 import NotFound from "./pages/NotFound";
@@ -59,6 +60,7 @@ const AppContent = () => {
             <Route path="/transactions-manual" element={<Transactions />} />
             <Route path="/recurring" element={<RecurringPayments />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/tax-prep" element={<TaxPrep />} />
             <Route path="/settings" element={<Settings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
