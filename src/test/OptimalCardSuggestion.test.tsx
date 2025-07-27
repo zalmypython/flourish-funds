@@ -15,15 +15,21 @@ const mockCards: CreditCard[] = [
     currentBalance: 0,
     paymentDueDay: 15,
     dueDate: '2024-01-15',
-    defaultRewardRate: 1.5,
     categoryRewards: { dining: { type: 'cashback', rate: 3.0 }, gas: { type: 'cashback', rate: 2.0 } },
     isActive: true,
-    statementBalance: 0,
     minimumPayment: 25,
     interestRate: 18.99,
     createdAt: '2024-01-01',
-    lastSyncDate: '2024-01-01',
-    bonuses: []
+    bonuses: [],
+    accountStatus: 'active',
+    lastBalanceUpdate: '2024-01-01',
+    cashBackBalance: 0,
+    rewardType: 'cashback',
+    lastPaymentDate: '2024-01-01',
+    redemptionHistory: [],
+    rewardHistory: [],
+    userId: 'test-user',
+    updatedAt: '2024-01-01'
   },
   {
     id: '2', 
@@ -35,15 +41,21 @@ const mockCards: CreditCard[] = [
     currentBalance: 0,
     paymentDueDay: 20,
     dueDate: '2024-01-20',
-    defaultRewardRate: 2.0,
     categoryRewards: { travel: { type: 'miles', rate: 5.0 }, dining: { type: 'points', rate: 2.0 } },
     isActive: true,
-    statementBalance: 0,
     minimumPayment: 25,
     interestRate: 16.99,
     createdAt: '2024-01-01',
-    lastSyncDate: '2024-01-01',
-    bonuses: []
+    bonuses: [],
+    accountStatus: 'active',
+    lastBalanceUpdate: '2024-01-01',
+    cashBackBalance: 0,
+    rewardType: 'miles',
+    lastPaymentDate: '2024-01-01',
+    redemptionHistory: [],
+    rewardHistory: [],
+    userId: 'test-user',
+    updatedAt: '2024-01-01'
   }
 ];
 
