@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { logger } from '@/utils/logger';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,9 +47,12 @@ export const QuickTransactionEntry = ({ accountId, accountType }: QuickTransacti
   // Get active budgets for expenses
   const activeBudgets = budgets.filter(budget => budget.status === 'active');
   
-  // Debug logging
-  console.log('QuickEntry - All budgets:', budgets);
-  console.log('QuickEntry - Active budgets:', activeBudgets);
+  // Log for debugging - replace with proper logging in production
+  logger.debug('QuickEntry budget data loaded', {
+    totalBudgets: budgets.length,
+    activeBudgets: activeBudgets.length,
+    budgetNames: activeBudgets.map(b => b.name)
+  });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 

@@ -7,10 +7,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { FileText, Download, Calendar, TrendingUp, BarChart3, PieChart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/utils/logger";
 import { AuthModal } from "@/components/AuthModal";
 
 const Reports = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const { handleError, executeWithErrorHandling } = useErrorHandler('ReportsPage');
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("");
@@ -51,15 +56,48 @@ const Reports = () => {
   ];
 
   const handleGenerateReport = async () => {
-    if (!selectedReportType || !selectedPeriod) return;
+    if (!selectedReportType || !selectedPeriod) {
+      logger.warn('Report generation attempted with missing parameters', {
+        hasReportType: !!selectedReportType,
+        hasPeriod: !!selectedPeriod
+      });
+      
+      toast({
+        title: "Missing Information",
+        description: "Please select both report type and period.",
+        variant: "destructive"
+      });
+      return;
+    }
     
-    setIsGenerating(true);
-    // Simulate report generation
-    setTimeout(() => {
-      setIsGenerating(false);
+    const result = await executeWithErrorHandling(async () => {
+      setIsGenerating(true);
+      
+      logger.info('Starting report generation', {
+        reportType: selectedReportType,
+        period: selectedPeriod,
+        userId: user?.id
+      });
+      
+      // Simulate report generation with realistic processing
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      logger.info('Report generation completed', {
+        reportType: selectedReportType,
+        period: selectedPeriod
+      });
+      
+      toast({
+        title: "Report Generated",
+        description: "Your financial report has been generated successfully.",
+      });
+      
       setSelectedReportType("");
       setSelectedPeriod("");
-    }, 2000);
+    }, { action: 'generate_report', additionalData: { reportType: selectedReportType, period: selectedPeriod } });
+    
+    setIsGenerating(false);
+    return result;
   };
 
   return (

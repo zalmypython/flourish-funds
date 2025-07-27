@@ -1,6 +1,7 @@
 import { apiClient } from '@/lib/apiClient';
 import { TransactionDocument } from '@/types';
 import { logger } from '@/utils/logger';
+import { enhancedSecureStorage } from '@/utils/enhancedSecureStorage';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 export class TransactionDocumentService {
@@ -172,7 +173,7 @@ export class TransactionDocumentService {
       const response = await fetch(url, {
         credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}` || ''
+          'Authorization': `Bearer ${await this.getSecureAuthToken()}` || ''
         }
       });
       
@@ -293,6 +294,33 @@ export class TransactionDocumentService {
       img.onerror = reject;
       img.src = URL.createObjectURL(file);
     });
+  }
+
+  /**
+   * Get authentication token securely
+   */
+  private async getSecureAuthToken(): Promise<string | null> {
+    try {
+      // Try secure storage first
+      const secureToken = await enhancedSecureStorage.getSecureItem('authToken');
+      if (secureToken) {
+        return secureToken;
+      }
+
+      // Fallback to localStorage
+      const fallbackToken = localStorage.getItem('authToken');
+      if (fallbackToken) {
+        logger.warn('Using fallback token from localStorage');
+        // Migrate to secure storage
+        await enhancedSecureStorage.setSecureItem('authToken', fallbackToken);
+        return fallbackToken;
+      }
+
+      return null;
+    } catch (error) {
+      logger.error('Failed to retrieve auth token', { error });
+      return localStorage.getItem('authToken'); // Final fallback
+    }
   }
 }
 
