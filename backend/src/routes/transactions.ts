@@ -269,5 +269,36 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res, next) => 
   }
 });
 
+// Document upload endpoint
+router.post('/:id/documents', authenticateToken, async (req: AuthRequest, res, next) => {
+  try {
+    // This would handle file upload with multer middleware
+    // For now, return a mock response
+    res.status(501).json({ error: 'Document upload not yet implemented' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get documents for transaction
+router.get('/:id/documents', authenticateToken, async (req: AuthRequest, res, next) => {
+  try {
+    // This would fetch documents for the transaction
+    res.json({ documents: [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete document
+router.delete('/:id/documents/:docId', authenticateToken, async (req: AuthRequest, res, next) => {
+  try {
+    // This would delete the specific document
+    res.json({ message: 'Document deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 
 export { router as transactionRoutes };

@@ -9,6 +9,8 @@ import { AuthModal } from '@/components/AuthModal';
 import { TransferModal } from '@/components/TransferModal';
 import { QuickTransactionEntry } from '@/components/QuickTransactionEntry';
 import { EnhancedTransactionList } from '@/components/EnhancedTransactionList';
+import { EditTransactionDialog } from '@/components/EditTransactionDialog';
+import { transactionDocumentService } from '@/services/transactionDocumentService';
 import OptimalCardSuggestion from '@/components/OptimalCardSuggestion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,7 +39,7 @@ interface Budget extends FirebaseDocument {
 
 export const Transactions = () => {
   const { user } = useAuth();
-  const { documents: transactions, loading, deleteDocument } = useFirestore<Transaction>('transactions');
+  const { documents: transactions, loading, deleteDocument, updateDocument } = useFirestore<Transaction>('transactions');
   const { documents: bankAccounts } = useFirestore<BankAccount>('bankAccounts');
   const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
   const { documents: budgets } = useFirestore<Budget>('budgets');
@@ -52,6 +54,8 @@ export const Transactions = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedAccount, setSelectedAccount] = useState('all');
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -171,6 +175,49 @@ export const Transactions = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handleEditTransaction = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateTransaction = async (transactionId: string, data: Partial<Transaction>) => {
+    try {
+      await updateDocument(transactionId, data);
+      setShowEditDialog(false);
+      setEditingTransaction(null);
+      
+      toast({
+        title: "Transaction updated",
+        description: "Transaction has been updated successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: "Failed to update transaction. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUploadDocument = async (transactionId: string, file: File, source: 'camera' | 'files' | 'drag-drop') => {
+    const validation = transactionDocumentService.validateFile(file);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    // Compress image if it's an image file
+    let fileToUpload = file;
+    if (file.type.startsWith('image/')) {
+      fileToUpload = await transactionDocumentService.compressImage(file);
+    }
+
+    return await transactionDocumentService.uploadDocument(transactionId, fileToUpload, source);
+  };
+
+  const handleDeleteDocument = async (transactionId: string, documentId: string) => {
+    await transactionDocumentService.deleteDocument(transactionId, documentId);
   };
 
   const filteredTransactions = transactions.filter(transaction => {
@@ -567,7 +614,21 @@ export const Transactions = () => {
       </Card>
 
       {/* Enhanced Transaction List */}
-      <EnhancedTransactionList />
+      <EnhancedTransactionList 
+        transactions={filteredTransactions}
+        onDelete={deleteDocument}
+        onEdit={handleEditTransaction}
+        showAmounts={showAmounts}
+      />
+
+      <EditTransactionDialog
+        transaction={editingTransaction}
+        open={showEditDialog}
+        onOpenChange={setShowEditDialog}
+        onUpdate={handleUpdateTransaction}
+        onUploadDocument={handleUploadDocument}
+        onDeleteDocument={handleDeleteDocument}
+      />
     </div>
   );
 };

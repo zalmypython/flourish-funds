@@ -1,32 +1,37 @@
 import { useState } from 'react';
+import { format } from 'date-fns';
+import { Search, Filter, Calendar, X, Trash2, Edit, Paperclip, Eye, EyeOff, ArrowUpDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { useFirestore } from '@/hooks/useFirestore';
-import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { DEFAULT_CATEGORIES, Transaction } from '@/types';
-import { Search, Filter, Calendar, ArrowUpDown, Trash2, Eye, EyeOff } from 'lucide-react';
-import { format } from 'date-fns';
 
-export const EnhancedTransactionList = () => {
-  const { getAllTransactions } = useAccountBalance();
-  const { deleteDocument } = useFirestore<Transaction>('transactions');
-  const [showAmounts, setShowAmounts] = useState(true);
+interface EnhancedTransactionListProps {
+  transactions: Transaction[];
+  onDelete: (transactionId: string) => void;
+  onEdit?: (transaction: Transaction) => void;
+  showAmounts: boolean;
+}
+
+export function EnhancedTransactionList({ 
+  transactions, 
+  onDelete, 
+  onEdit,
+  showAmounts 
+}: EnhancedTransactionListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedAccount, setSelectedAccount] = useState('all');
   const [dateRange, setDateRange] = useState('all');
 
-  const allTransactions = getAllTransactions();
-
   // Enhanced filtering
-  const filteredTransactions = allTransactions.filter(transaction => {
+  const filteredTransactions = transactions.filter(transaction => {
     const matchesSearch = transaction.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          transaction.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.accountName.toLowerCase().includes(searchTerm.toLowerCase());
+                         (transaction.merchantName && transaction.merchantName.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesCategory = selectedCategory === 'all' || transaction.category === selectedCategory;
     const matchesAccount = selectedAccount === 'all' || transaction.accountId === selectedAccount;
@@ -54,8 +59,12 @@ export const EnhancedTransactionList = () => {
 
   // Get unique accounts for filter dropdown
   const accountMap = new Map();
-  allTransactions.forEach(t => {
-    accountMap.set(t.accountId, { id: t.accountId, name: t.accountName, type: t.accountType });
+  transactions.forEach(t => {
+    accountMap.set(t.accountId, { 
+      id: t.accountId, 
+      name: `Account ${t.accountId}`, // Fallback name since we don't have accountName in the type
+      type: t.accountType 
+    });
   });
   const uniqueAccounts = Array.from(accountMap.values());
 
@@ -88,21 +97,10 @@ export const EnhancedTransactionList = () => {
       {/* Enhanced Filters */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>All Transactions</CardTitle>
-              <CardDescription>
-                Unified view of all your financial transactions across accounts
-              </CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAmounts(!showAmounts)}
-            >
-              {showAmounts ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-            </Button>
-          </div>
+          <CardTitle>Transaction Filters</CardTitle>
+          <CardDescription>
+            Search and filter your transactions
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-5">
@@ -191,7 +189,7 @@ export const EnhancedTransactionList = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Recent Transactions ({filteredTransactions.length})</span>
+            <span>Transactions ({filteredTransactions.length})</span>
             <ArrowUpDown className="h-4 w-4" />
           </CardTitle>
         </CardHeader>
@@ -221,19 +219,11 @@ export const EnhancedTransactionList = () => {
                       </div>
                       
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>{transaction.accountName}</span>
+                        <span>Account {transaction.accountId}</span>
                         <span>•</span>
                         <span>{DEFAULT_CATEGORIES.find(c => c.id === transaction.category)?.name || transaction.category}</span>
                         <span>•</span>
                         <span>{format(new Date(transaction.date), 'MMM d, yyyy')}</span>
-                        
-                        {/* Transfer information */}
-                        {transaction.toAccountName && (
-                          <>
-                            <span>•</span>
-                            <span className="text-blue-600">→ {transaction.toAccountName}</span>
-                          </>
-                        )}
                       </div>
                       
                       {transaction.notes && (
@@ -249,11 +239,31 @@ export const EnhancedTransactionList = () => {
                       }`}>
                         {formatAmount(transaction.amount, transaction.type)}
                       </span>
+
+                      {/* Document indicator */}
+                      {transaction.documents && transaction.documents.length > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          <Paperclip className="h-3 w-3 mr-1" />
+                          {transaction.documents.length}
+                        </Badge>
+                      )}
+                      
+                      {onEdit && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => onEdit(transaction)}
+                          title="Edit transaction"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
                       
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        onClick={() => deleteDocument(transaction.id)}
+                        onClick={() => onDelete(transaction.id)}
+                        title="Delete transaction"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -266,4 +276,4 @@ export const EnhancedTransactionList = () => {
       </Card>
     </div>
   );
-};
+}

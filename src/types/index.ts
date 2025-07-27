@@ -5,6 +5,18 @@ export interface BaseDocument {
   updatedAt: string;
 }
 
+export interface TransactionDocument {
+  id: string;
+  filename: string;
+  originalName: string;
+  fileType: 'image/jpeg' | 'image/png' | 'application/pdf' | 'image/heic';
+  fileSize: number;
+  url: string;
+  thumbnailUrl?: string;
+  uploadedAt: string;
+  source: 'camera' | 'files' | 'drag-drop';
+}
+
 export interface Transaction extends BaseDocument {
   date: string;
   amount: number;
@@ -16,6 +28,7 @@ export interface Transaction extends BaseDocument {
   type: 'income' | 'expense' | 'transfer' | 'payment';
   tags?: string[];
   notes?: string;
+  documents?: TransactionDocument[];
   isRecurring?: boolean;
   recurringId?: string;
   status: 'pending' | 'cleared' | 'reconciled';
