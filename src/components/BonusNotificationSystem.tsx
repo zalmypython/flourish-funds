@@ -2,20 +2,23 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Gift, Calendar, DollarSign, X } from 'lucide-react';
+import { Bell, Gift, Calendar, DollarSign, X, AlertTriangle, CreditCard as CreditCardIcon } from 'lucide-react';
 import { CreditCard, CreditCardBonus } from '@/types';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useToast } from '@/hooks/use-toast';
+import { CreditCardNotificationService } from '@/services/creditCardNotificationService';
 
 interface NotificationItem {
   id: string;
-  type: 'bonus_completion' | 'bonus_deadline' | 'annual_fee' | 'optimal_card';
+  type: 'bonus_completion' | 'bonus_deadline' | 'annual_fee' | 'optimal_card' | 'balance_due' | 'high_utilization' | 'payment_reminder' | 'late_payment' | 'statement_ready';
   title: string;
   description: string;
   priority: 'low' | 'medium' | 'high';
   cardId?: string;
   actionLabel?: string;
   onAction?: () => void;
+  daysUntilDue?: number;
+  amount?: number;
 }
 
 interface BonusNotificationSystemProps {
@@ -34,6 +37,23 @@ export default function BonusNotificationSystem({ cards }: BonusNotificationSyst
       
       cards.forEach(card => {
         if (!card.isActive) return;
+
+        // Generate balance-related notifications
+        const balanceNotifications = CreditCardNotificationService.generateBalanceNotifications(card);
+        balanceNotifications.forEach(balanceNotif => {
+          newNotifications.push({
+            id: balanceNotif.id,
+            type: balanceNotif.type,
+            title: balanceNotif.title,
+            description: balanceNotif.message,
+            priority: balanceNotif.priority,
+            cardId: balanceNotif.cardId,
+            daysUntilDue: balanceNotif.daysUntilDue,
+            amount: balanceNotif.amount,
+            actionLabel: balanceNotif.actionRequired ? 'Make Payment' : 'View Details',
+            onAction: () => window.location.href = `/credit-cards/${card.id}`
+          });
+        });
 
         // Check for bonuses close to completion
         card.bonuses?.forEach(bonus => {
@@ -119,6 +139,12 @@ export default function BonusNotificationSystem({ cards }: BonusNotificationSyst
         return <Gift className="h-4 w-4" />;
       case 'annual_fee':
         return <DollarSign className="h-4 w-4" />;
+      case 'balance_due':
+      case 'payment_reminder':
+      case 'late_payment':
+        return <CreditCardIcon className="h-4 w-4" />;
+      case 'high_utilization':
+        return <AlertTriangle className="h-4 w-4" />;
       default:
         return <Bell className="h-4 w-4" />;
     }

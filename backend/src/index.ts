@@ -20,6 +20,8 @@ import {
 import { authRoutes } from './routes/auth';
 import { bankAccountRoutes } from './routes/bankAccounts';
 import { creditCardRoutes } from './routes/creditCards';
+import { notificationRoutes } from './routes/notifications';
+import { notificationRoutes } from './routes/notifications';
 import { transactionRoutes } from './routes/transactions';
 import { budgetRoutes } from './routes/budgets';
 import { savingsGoalRoutes } from './routes/savingsGoals';
@@ -77,6 +79,7 @@ app.use('/api/recurring-payments', apiLimiter, recurringPaymentRoutes);
 app.use('/api/stocks', apiLimiter, stockRoutes);
 app.use('/api/account-goals', apiLimiter, accountGoalRoutes);
 app.use('/api/plaid', apiLimiter, plaidRoutes);
+app.use('/api/notifications', apiLimiter, notificationRoutes);
 
 // Error handling
 app.use(errorHandler);

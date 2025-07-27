@@ -29,7 +29,11 @@ const mockCards: CreditCard[] = [
     redemptionHistory: [],
     rewardHistory: [],
     userId: 'test-user',
-    updatedAt: '2024-01-01'
+    updatedAt: '2024-01-01',
+    statementBalance: 0,
+    minimumPaymentDue: 25,
+    nextStatementDate: '2024-02-15',
+    paymentReminderDays: 7
   },
   {
     id: '2', 
@@ -55,7 +59,11 @@ const mockCards: CreditCard[] = [
     redemptionHistory: [],
     rewardHistory: [],
     userId: 'test-user',
-    updatedAt: '2024-01-01'
+    updatedAt: '2024-01-01',
+    statementBalance: 0,
+    minimumPaymentDue: 25,
+    nextStatementDate: '2024-02-20',
+    paymentReminderDays: 7
   }
 ];
 

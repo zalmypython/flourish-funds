@@ -188,6 +188,14 @@ export interface CreditCard extends BaseDocument {
   // Cached balance for performance
   currentBalance: number;
   lastBalanceUpdate: string;
+  // Enhanced balance tracking
+  statementBalance: number;
+  minimumPaymentDue: number;
+  nextStatementDate: string;
+  paymentReminderDays: number;
+  lastStatementDate?: string;
+  autoPayEnabled?: boolean;
+  autoPayAmount?: number;
   // Enhanced rewards and cash back tracking
   cashBackBalance: number;
   categoryRewards: { [category: string]: { type: 'cashback' | 'points' | 'miles'; rate: number; ratio?: string } };
@@ -204,6 +212,29 @@ export interface CreditCard extends BaseDocument {
     rewardEarned: number;
     description?: string;
   }[];
+}
+
+export interface NotificationPreferences extends BaseDocument {
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  balanceReminders: boolean;
+  paymentReminders: boolean;
+  bonusAlerts: boolean;
+  utilizationWarnings: boolean;
+  reminderDays: number[];
+  emailAddress?: string;
+  notificationTime: string; // HH:MM format
+}
+
+export interface NotificationLog extends BaseDocument {
+  type: 'balance_due' | 'high_utilization' | 'payment_reminder' | 'bonus_alert' | 'late_payment';
+  cardId: string;
+  title: string;
+  message: string;
+  sentAt: string;
+  emailSent: boolean;
+  dismissed: boolean;
+  priority: 'low' | 'medium' | 'high';
 }
 
 // Stock Portfolio Types
