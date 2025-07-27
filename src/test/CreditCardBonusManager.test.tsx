@@ -9,7 +9,7 @@ const mockBonuses = [
     title: 'Welcome Bonus',
     description: 'Spend $3000 in 3 months',
     requirement: 'Spend $3000 in 3 months',
-    bonusAmount: 50000,
+    bonusAmount: "50000",
     bonusValue: '$500',
     progress: 1500,
     currentSpending: 1500,

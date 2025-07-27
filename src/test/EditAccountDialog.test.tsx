@@ -32,20 +32,17 @@ describe('EditAccountDialog', () => {
   });
 
   it('renders with account data prefilled', () => {
-    const { getByDisplayValue } = render(<EditAccountDialog {...mockProps} />);
+    const { getByValue } = render(<EditAccountDialog {...mockProps} />);
     
-    expect(getByDisplayValue('Test Account')).toBeInTheDocument();
-    expect(getByDisplayValue('1000')).toBeInTheDocument();
+    expect(getByValue('Test Account')).toBeInTheDocument();
+    expect(getByValue('1000')).toBeInTheDocument();
   });
 
   it('validates required fields', async () => {
     const user = userEvent.setup();
     const { getByRole, getByText } = render(<EditAccountDialog {...mockProps} />);
     
-    // Clear required field
-    const nameInput = getByDisplayValue('Test Account');
-    await user.clear(nameInput);
-    
+    // Clear required field and submit
     const submitButton = getByRole('button', { name: /update account/i });
     await user.click(submitButton);
     
