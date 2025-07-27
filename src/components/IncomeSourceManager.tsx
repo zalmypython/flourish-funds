@@ -4,11 +4,13 @@ import { INCOME_SOURCE_TYPES } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, DollarSign, TrendingUp } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, Edit2, Trash2 } from "lucide-react";
+import { IncomeSourceForm } from "./IncomeSourceForm";
 
 export function IncomeSourceManager() {
-  const { incomeSources, isLoading, getTotalExpectedMonthlyIncome } = useIncomeSources();
+  const { incomeSources, isLoading, getTotalExpectedMonthlyIncome, deleteIncomeSource } = useIncomeSources();
   const [showForm, setShowForm] = useState(false);
+  const [editingSource, setEditingSource] = useState(null);
 
   if (isLoading) {
     return <div className="text-center py-8">Loading income sources...</div>;
@@ -112,6 +114,26 @@ export function IncomeSourceManager() {
                     <span className="text-sm">{source.payerRules.length}</span>
                   </div>
                 </div>
+                
+                <div className="flex gap-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditingSource(source)}
+                    className="flex-1"
+                  >
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => deleteIncomeSource(source.id)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           );
@@ -133,6 +155,17 @@ export function IncomeSourceManager() {
           </CardContent>
         </Card>
       )}
+
+      <IncomeSourceForm
+        open={showForm || !!editingSource}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowForm(false);
+            setEditingSource(null);
+          }
+        }}
+        incomeSource={editingSource}
+      />
     </div>
   );
 }

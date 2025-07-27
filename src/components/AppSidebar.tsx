@@ -11,7 +11,8 @@ import {
   FileText,
   Receipt,
   BarChart3,
-  Calculator
+  Calculator,
+  DollarSign
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -39,6 +40,7 @@ const toolsItems = [
   { title: "Portfolio", url: "/portfolio", icon: BarChart3 },
   { title: "Savings Goals", url: "/goals", icon: Target },
   { title: "Net Worth", url: "/net-worth", icon: TrendingUp },
+  { title: "Income Sources", url: "/income-sources", icon: DollarSign },
   { title: "Recurring Payments", url: "/recurring", icon: Repeat },
   { title: "Reports", url: "/reports", icon: FileText },
   { title: "Tax Prep", url: "/tax-prep", icon: Calculator },

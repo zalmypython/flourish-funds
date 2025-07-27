@@ -20,6 +20,7 @@ import Settings from "./pages/Settings";
 import TaxPrep from "./pages/TaxPrep";
 import { Transactions } from "./pages/Transactions";
 import { PlaidTransactions } from "./pages/PlaidTransactions";
+import IncomeSources from "./pages/IncomeSources";
 import NotFound from "./pages/NotFound";
 import { PerformanceMonitor } from "./components/PerformanceMonitor";
 import { setupGlobalErrorHandling } from "./utils/errorHandler";
@@ -61,6 +62,7 @@ const AppContent = () => {
             <Route path="/recurring" element={<RecurringPayments />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/tax-prep" element={<TaxPrep />} />
+            <Route path="/income-sources" element={<IncomeSources />} />
             <Route path="/settings" element={<Settings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

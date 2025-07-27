@@ -33,6 +33,7 @@ export interface Transaction extends BaseDocument {
   recurringId?: string;
   status: 'pending' | 'cleared' | 'reconciled';
   merchantName?: string;
+  merchant?: string;
   location?: string;
   // Simplified transfer tracking - single transaction approach
   fromAccountId?: string;
