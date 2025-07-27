@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { StockPortfolioManager } from '../components/StockPortfolioManager';
 import { AuthModal } from '../components/AuthModal';
-import { useAuth } from '../hooks/useAuth';
+import { useApiAuth } from '../hooks/useApiAuth';
 
 export default function Portfolio() {
-  const { user } = useAuth();
+  const { user } = useApiAuth();
   const [authModalOpen, setAuthModalOpen] = useState(!user);
 
   if (!user) {

@@ -9,12 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { DEFAULT_CATEGORIES } from "@/types";
-import { useFirestore, FirebaseDocument } from "@/hooks/useFirestore";
-import { useAuth } from "@/hooks/useAuth";
+import { useApiFirestore } from "@/hooks/useApiFirestore";
+import { useApiAuth } from "@/hooks/useApiAuth";
+import { BaseDocument } from "@/types";
 import { AuthModal } from "@/components/AuthModal";
 import { Plus, Target, AlertTriangle, DollarSign, Calendar, Trash2 } from "lucide-react";
 
-interface Budget extends FirebaseDocument {
+interface Budget extends BaseDocument {
   name: string;
   category: string;
   amount: number;
@@ -27,8 +28,8 @@ interface Budget extends FirebaseDocument {
 }
 
 const Budgets = () => {
-  const { user } = useAuth();
-  const { documents: budgets, loading, addDocument, updateDocument, deleteDocument } = useFirestore<Budget>('budgets');
+  const { user } = useApiAuth();
+  const { documents: budgets, loading, addDocument, updateDocument, deleteDocument } = useApiFirestore<Budget>('budgets');
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);

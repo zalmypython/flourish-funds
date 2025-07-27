@@ -137,7 +137,7 @@ export const Transactions = () => {
           const transactionForRewards = { 
             ...newTransactionData, 
             id: `temp_${Date.now()}`,
-            userId: user?.uid || '',
+            userId: user?.id || '',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           } as Transaction;

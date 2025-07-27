@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { useFirestore, FirebaseDocument } from '@/hooks/useFirestore';
+import { useApiFirestore } from '@/hooks/useApiFirestore';
+import { BaseDocument } from '@/types';
 import { useAccountBalance } from '@/hooks/useAccountBalance';
 import { Transaction, BankAccount, CreditCard } from '@/types';
 import { 
@@ -28,9 +29,9 @@ export const FinancialOverview = ({
   showAmounts = true, 
   onToggleAmounts 
 }: FinancialOverviewProps) => {
-  const { documents: transactions } = useFirestore<Transaction>('transactions');
-  const { documents: bankAccounts } = useFirestore<BankAccount>('bankAccounts');
-  const { documents: creditCards } = useFirestore<CreditCard>('creditCards');
+  const { documents: transactions } = useApiFirestore<Transaction>('transactions');
+  const { documents: bankAccounts } = useApiFirestore<BankAccount>('bank-accounts');
+  const { documents: creditCards } = useApiFirestore<CreditCard>('credit-cards');
   const { calculateAccountBalance } = useAccountBalance();
 
   // Calculate total balances

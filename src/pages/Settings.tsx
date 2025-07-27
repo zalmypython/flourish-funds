@@ -13,7 +13,7 @@ import { AuthModal } from "@/components/AuthModal";
 const Settings = () => {
   const { user, logout } = useAuth();
   const [formData, setFormData] = useState({
-    name: user?.displayName || "",
+    name: user?.email?.split('@')[0] || "",
     email: user?.email || ""
   });
   const [notifications, setNotifications] = useState({

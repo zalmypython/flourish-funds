@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useApiAuth } from "@/hooks/useApiAuth";
 import { AuthModal } from "@/components/AuthModal";
 import { FinancialHealthDashboard } from "@/components/FinancialHealthDashboard";
 import { FinancialOverview } from "@/components/FinancialOverview";
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user } = useApiAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showBalances, setShowBalances] = useState(true);
 
