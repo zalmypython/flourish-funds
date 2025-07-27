@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useApiAuth } from '@/hooks/useApiAuth';
 import { useToast } from '@/hooks/use-toast';
 import apiClient from '@/lib/apiClient';
 
@@ -48,7 +48,7 @@ export const useBankConnections = () => {
   const [connections, setConnections] = useState<BankConnection[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user } = useApiAuth();
   const { toast } = useToast();
 
   // Fetch user's bank connections

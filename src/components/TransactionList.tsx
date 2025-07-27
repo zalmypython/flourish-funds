@@ -8,30 +8,34 @@ import { useToast } from '@/hooks/use-toast';
 import { Search, Filter, Eye, EyeOff, Calendar, DollarSign, Tag } from 'lucide-react';
 import { format } from 'date-fns';
 
-interface Transaction {
+interface PlaidTransaction {
   id: string;
-  plaidTransactionId: string;
+  plaidTransactionId?: string;
+  userId?: string;
+  bankConnectionId?: string;
   accountId: string;
   amount: number;
   date: string;
-  name: string;
+  name?: string;
+  description?: string;
   merchantName?: string;
   category: string[];
   subcategory?: string;
   internalCategory?: string;
-  pending: boolean;
+  pending?: boolean;
   location?: {
     address?: string;
     city?: string;
     region?: string;
   };
-  isHidden: boolean;
+  isHidden?: boolean;
+  isManual?: boolean;
   notes?: string;
   tags?: string[];
 }
 
 interface TransactionListProps {
-  transactions: Transaction[];
+  transactions: PlaidTransaction[];
   isLoading?: boolean;
   onUpdateCategory?: (transactionId: string, category: string) => Promise<void>;
   onToggleVisibility?: (transactionId: string, isHidden: boolean) => Promise<void>;
@@ -73,7 +77,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         const matchesSearch = 
-          transaction.name.toLowerCase().includes(searchLower) ||
+          (transaction.name || transaction.description || '').toLowerCase().includes(searchLower) ||
           transaction.merchantName?.toLowerCase().includes(searchLower) ||
           transaction.category.some(cat => cat.toLowerCase().includes(searchLower));
         
@@ -103,7 +107,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
           comparison = Math.abs(a.amount) - Math.abs(b.amount);
           break;
         case 'name':
-          comparison = a.name.localeCompare(b.name);
+          comparison = (a.name || a.description || '').localeCompare(b.name || b.description || '');
           break;
       }
 
@@ -280,14 +284,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                   <div className="flex items-center gap-4 flex-1">
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{transaction.name}</h3>
+                        <h3 className="font-semibold">{transaction.name || transaction.description}</h3>
                         {transaction.pending && (
                           <Badge variant="outline" className="text-xs">
                             Pending
                           </Badge>
                         )}
                       </div>
-                      {transaction.merchantName && transaction.merchantName !== transaction.name && (
+                      {transaction.merchantName && transaction.merchantName !== (transaction.name || transaction.description) && (
                         <p className="text-sm text-muted-foreground">{transaction.merchantName}</p>
                       )}
                       <div className="flex items-center gap-2 mt-1">
@@ -340,7 +344,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleToggleVisibility(transaction.id, transaction.isHidden)}
+                        onClick={() => handleToggleVisibility(transaction.id, transaction.isHidden || false)}
                       >
                         {transaction.isHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                       </Button>

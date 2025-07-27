@@ -3,7 +3,7 @@ import { usePlaidLink, PlaidLinkOnSuccess, PlaidLinkOnExit } from 'react-plaid-l
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
+import { useApiAuth } from '@/hooks/useApiAuth';
 import { Loader2, LinkIcon, Building2 } from 'lucide-react';
 import apiClient from '@/lib/apiClient';
 
@@ -25,7 +25,7 @@ export const PlaidLinkButton: React.FC<PlaidLinkButtonProps> = ({
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user } = useApiAuth();
 
   // Initialize Plaid Link
   const initializePlaidLink = useCallback(async () => {

@@ -1,20 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useApiAuth } from '@/hooks/useApiAuth';
 import { useToast } from '@/hooks/use-toast';
 import apiClient from '@/lib/apiClient';
 
 export interface Transaction {
   id: string;
-  plaidTransactionId: string;
+  plaidTransactionId?: string;
+  userId: string;
+  bankConnectionId?: string;
   accountId: string;
   amount: number;
   date: string;
-  name: string;
+  name?: string;
+  description?: string;
   merchantName?: string;
   category: string[];
   subcategory?: string;
   internalCategory?: string;
-  pending: boolean;
+  pending?: boolean;
   location?: {
     address?: string;
     city?: string;
@@ -22,21 +25,30 @@ export interface Transaction {
     postalCode?: string;
     country?: string;
   };
-  isHidden: boolean;
+  isHidden?: boolean;
+  isManual?: boolean;
   notes?: string;
   tags?: string[];
+  type?: 'income' | 'expense' | 'transfer';
+  accountType?: 'bank' | 'credit';
+  status?: 'pending' | 'cleared' | 'reconciled';
 }
 
 export interface TransactionSummary {
   totalTransactions: number;
   totalIncome: number;
   totalExpenses: number;
-  categorySummary: { [category: string]: number };
-  monthlyTrend: { month: string; income: number; expenses: number }[];
+  netIncome: number;
+  categoryBreakdown: { [category: string]: number };
+  timeRange: {
+    startDate?: string;
+    endDate?: string;
+  };
 }
 
 export interface SyncLog {
   id: string;
+  userId: string;
   bankConnectionId: string;
   syncType: 'manual' | 'automatic' | 'initial';
   status: 'pending' | 'running' | 'completed' | 'failed';
@@ -45,6 +57,7 @@ export interface SyncLog {
   transactionsAdded: number;
   transactionsUpdated: number;
   errors: string[];
+  metadata?: Record<string, any>;
 }
 
 export const useTransactions = () => {
@@ -53,7 +66,7 @@ export const useTransactions = () => {
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
+  const { user } = useApiAuth();
   const { toast } = useToast();
 
   // Fetch transactions
@@ -81,7 +94,7 @@ export const useTransactions = () => {
       });
 
       const response = await apiClient.get(`/api/transactions?${params.toString()}`);
-      setTransactions(response.data.transactions);
+      setTransactions(response.data || []);
     } catch (err) {
       const errorMessage = 'Failed to fetch transactions';
       setError(errorMessage);
@@ -120,7 +133,7 @@ export const useTransactions = () => {
 
     try {
       const response = await apiClient.get(`/api/transactions/sync-logs?limit=${limit}`);
-      setSyncLogs(response.data.syncLogs);
+      setSyncLogs(response.data || []);
     } catch (err) {
       console.error('Error fetching sync logs:', err);
     }

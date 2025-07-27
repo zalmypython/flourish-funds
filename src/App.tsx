@@ -18,6 +18,7 @@ import RecurringPayments from "./pages/RecurringPayments";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import { Transactions } from "./pages/Transactions";
+import { PlaidTransactions } from "./pages/PlaidTransactions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,7 +39,8 @@ const AppContent = () => {
             <Route path="/goals" element={<SavingsGoals />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/net-worth" element={<NetWorth />} />
-            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/transactions" element={<PlaidTransactions />} />
+            <Route path="/transactions-manual" element={<Transactions />} />
             <Route path="/recurring" element={<RecurringPayments />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
