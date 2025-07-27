@@ -1,6 +1,16 @@
 import crypto from 'crypto';
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32);
+// Use environment variable or throw error for production security
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY 
+  ? Buffer.from(process.env.ENCRYPTION_KEY, 'hex')
+  : (() => {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('ENCRYPTION_KEY environment variable is required in production');
+      }
+      // Development fallback - consistent key
+      return crypto.scryptSync('dev-encryption-key', 'salt', 32);
+    })();
+
 const ALGORITHM = 'aes-256-gcm';
 
 export interface EncryptedData {
@@ -9,15 +19,15 @@ export interface EncryptedData {
   tag: string;
 }
 
-// Encrypt sensitive data
+// Encrypt sensitive data with proper AES-GCM
 export const encrypt = (text: string): EncryptedData => {
   const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipher(ALGORITHM, ENCRYPTION_KEY);
+  const cipher = crypto.createCipherGCM(ALGORITHM, ENCRYPTION_KEY, iv);
   
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
   
-  const tag = (cipher as any).getAuthTag?.() || '';
+  const tag = cipher.getAuthTag();
   
   return {
     encrypted,
@@ -26,18 +36,28 @@ export const encrypt = (text: string): EncryptedData => {
   };
 };
 
-// Decrypt sensitive data
+// Decrypt sensitive data with proper AES-GCM
 export const decrypt = (encryptedData: EncryptedData): string => {
-  const decipher = crypto.createDecipher(ALGORITHM, ENCRYPTION_KEY);
+  const iv = Buffer.from(encryptedData.iv, 'hex');
+  const tag = Buffer.from(encryptedData.tag, 'hex');
+  const decipher = crypto.createDecipherGCM(ALGORITHM, ENCRYPTION_KEY, iv);
   
-  if (encryptedData.tag) {
-    (decipher as any).setAuthTag?.(Buffer.from(encryptedData.tag, 'hex'));
-  }
+  decipher.setAuthTag(tag);
   
   let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
   
   return decrypted;
+};
+
+// Encrypt any string data (for access tokens, etc.)
+export const encryptData = (data: string): EncryptedData => {
+  return encrypt(data);
+};
+
+// Decrypt any string data
+export const decryptData = (encryptedData: EncryptedData): string => {
+  return decrypt(encryptedData);
 };
 
 // Hash sensitive data (one-way)
@@ -61,12 +81,15 @@ export const maskSensitiveData = (data: string, visibleChars: number = 4): strin
 export const encryptFinancialData = (data: any): any => {
   if (!data) return data;
   
-  const sensitiveFields = ['accountNumber', 'routingNumber', 'ssn', 'ein'];
+  const sensitiveFields = ['accountNumber', 'routingNumber', 'ssn', 'ein', 'accessToken'];
   const encrypted = { ...data };
   
   sensitiveFields.forEach(field => {
-    if (encrypted[field]) {
-      encrypted[field] = encrypt(encrypted[field].toString());
+    if (encrypted[field] && typeof encrypted[field] === 'string') {
+      encrypted[field] = encrypt(encrypted[field]);
+    } else if (encrypted[field] && typeof encrypted[field] === 'object' && encrypted[field].encrypted) {
+      // Already encrypted, leave as is
+      return;
     }
   });
   
@@ -77,15 +100,16 @@ export const encryptFinancialData = (data: any): any => {
 export const decryptFinancialData = (data: any): any => {
   if (!data) return data;
   
-  const sensitiveFields = ['accountNumber', 'routingNumber', 'ssn', 'ein'];
+  const sensitiveFields = ['accountNumber', 'routingNumber', 'ssn', 'ein', 'accessToken'];
   const decrypted = { ...data };
   
   sensitiveFields.forEach(field => {
-    if (decrypted[field] && typeof decrypted[field] === 'object') {
+    if (decrypted[field] && typeof decrypted[field] === 'object' && decrypted[field].encrypted) {
       try {
         decrypted[field] = decrypt(decrypted[field]);
       } catch (error) {
         console.error(`Failed to decrypt ${field}:`, error);
+        // Don't throw error, just log it to prevent cascade failures
       }
     }
   });

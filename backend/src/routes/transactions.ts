@@ -23,6 +23,55 @@ interface Transaction {
   updatedAt: Date;
 }
 
+// Get transaction summary (MUST come before /:id route)
+router.get('/summary', authenticateToken, async (req: AuthRequest, res, next) => {
+  try {
+    const { startDate, endDate, groupBy } = req.query;
+    
+    const summary = await plaidTransactionService.getTransactionSummary(
+      req.userId!,
+      {
+        startDate: startDate as string,
+        endDate: endDate as string,
+        groupBy: groupBy as 'category' | 'month' | 'account'
+      }
+    );
+    
+    res.json(summary);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get sync logs (MUST come before /:id route)
+router.get('/sync-logs', authenticateToken, async (req: AuthRequest, res, next) => {
+  try {
+    const { limit = 10 } = req.query;
+    
+    const syncLogs = await plaidTransactionService.getUserSyncLogs(req.userId!, Number(limit));
+    res.json(syncLogs);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Manual sync trigger
+router.post('/sync', authenticateToken, async (req: AuthRequest, res, next) => {
+  try {
+    const { connectionId, startDate, endDate } = req.body;
+    
+    if (!connectionId) {
+      return res.status(400).json({ error: 'Connection ID is required' });
+    }
+    
+    // This would trigger a sync via the bank connection service
+    // For now, return a success message
+    res.json({ message: 'Sync triggered successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get all transactions (manual + Plaid imported)
 router.get('/', authenticateToken, async (req: AuthRequest, res, next) => {
   try {
@@ -102,74 +151,6 @@ router.post('/', authenticateToken, async (req: AuthRequest, res, next) => {
   }
 });
 
-// Update transaction
-router.put('/:id', authenticateToken, async (req: AuthRequest, res, next) => {
-  try {
-    const updateData = { ...req.body };
-    if (updateData.date) {
-      updateData.date = new Date(updateData.date);
-    }
-    
-    // Try updating manual transaction first
-    try {
-      await baseTransactionService.update(req.params.id, req.userId!, updateData);
-      res.json({ message: 'Transaction updated successfully' });
-    } catch (error: any) {
-      // If not found in manual transactions, it might be a Plaid transaction category update
-      if (error.message.includes('not found') && updateData.category) {
-        // Handle Plaid transaction category update separately
-        res.status(400).json({ error: 'Use /transactions/:id/category endpoint for Plaid transactions' });
-      } else {
-        throw error;
-      }
-    }
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Delete transaction (manual transactions only)
-router.delete('/:id', authenticateToken, async (req: AuthRequest, res, next) => {
-  try {
-    await baseTransactionService.delete(req.params.id, req.userId!);
-    res.json({ message: 'Transaction deleted successfully' });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Get sync logs
-router.get('/sync-logs', authenticateToken, async (req: AuthRequest, res, next) => {
-  try {
-    const { limit = 10 } = req.query;
-    
-    const syncLogs = await plaidTransactionService.getUserSyncLogs(req.userId!, Number(limit));
-    res.json(syncLogs);
-  } catch (error) {
-    next(error);
-  }
-});
-
-// Get transaction summary
-router.get('/summary', authenticateToken, async (req: AuthRequest, res, next) => {
-  try {
-    const { startDate, endDate, groupBy } = req.query;
-    
-    const summary = await plaidTransactionService.getTransactionSummary(
-      req.userId!,
-      {
-        startDate: startDate as string,
-        endDate: endDate as string,
-        groupBy: groupBy as 'category' | 'month' | 'account'
-      }
-    );
-    
-    res.json(summary);
-  } catch (error) {
-    next(error);
-  }
-});
-
 // Update Plaid transaction category
 router.put('/:id/category', authenticateToken, async (req: AuthRequest, res, next) => {
   try {
@@ -220,21 +201,41 @@ router.put('/:id/visibility', authenticateToken, async (req: AuthRequest, res, n
   }
 });
 
-// Manual sync trigger
-router.post('/sync', authenticateToken, async (req: AuthRequest, res, next) => {
+// Update transaction
+router.put('/:id', authenticateToken, async (req: AuthRequest, res, next) => {
   try {
-    const { connectionId, startDate, endDate } = req.body;
-    
-    if (!connectionId) {
-      return res.status(400).json({ error: 'Connection ID is required' });
+    const updateData = { ...req.body };
+    if (updateData.date) {
+      updateData.date = new Date(updateData.date);
     }
     
-    // This would trigger a sync via the bank connection service
-    // For now, return a success message
-    res.json({ message: 'Sync triggered successfully' });
+    // Try updating manual transaction first
+    try {
+      await baseTransactionService.update(req.params.id, req.userId!, updateData);
+      res.json({ message: 'Transaction updated successfully' });
+    } catch (error: any) {
+      // If not found in manual transactions, it might be a Plaid transaction category update
+      if (error.message.includes('not found') && updateData.category) {
+        // Handle Plaid transaction category update separately
+        res.status(400).json({ error: 'Use /transactions/:id/category endpoint for Plaid transactions' });
+      } else {
+        throw error;
+      }
+    }
   } catch (error) {
     next(error);
   }
 });
+
+// Delete transaction (manual transactions only)
+router.delete('/:id', authenticateToken, async (req: AuthRequest, res, next) => {
+  try {
+    await baseTransactionService.delete(req.params.id, req.userId!);
+    res.json({ message: 'Transaction deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 
 export { router as transactionRoutes };

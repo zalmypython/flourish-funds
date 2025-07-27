@@ -1,6 +1,6 @@
 import { db } from '../config/firebase';
 import { BankConnectionModel, PlaidAccountData } from '../models/bankConnection';
-import { encryptFinancialData, decryptFinancialData, encryptData } from '../middleware/encryption';
+import { encryptFinancialData, decryptFinancialData, encryptData, decryptData } from '../middleware/encryption';
 import { auditLog } from '../middleware/auditLogger';
 import PlaidService from './plaidService';
 import FirebaseTransactionService from './firebaseTransactionService';
@@ -152,7 +152,7 @@ export default class FirebaseBankConnectionService {
         await this.transactionService.updateSyncLog(syncLogId, { status: 'running' });
 
         // Decrypt access token
-        const accessToken = decryptFinancialData({ accessToken: connection.accessToken }).accessToken;
+        const accessToken = decryptData(connection.accessToken);
 
         // Fetch transactions from Plaid
         const plaidTransactions = await this.plaidService.getTransactions(
@@ -247,7 +247,7 @@ export default class FirebaseBankConnectionService {
       }
 
       // Decrypt access token and remove from Plaid
-      const accessToken = decryptFinancialData({ accessToken: connection.accessToken }).accessToken;
+      const accessToken = decryptData(connection.accessToken);
       await this.plaidService.removeItem(accessToken);
 
       // Mark connection as inactive instead of deleting
