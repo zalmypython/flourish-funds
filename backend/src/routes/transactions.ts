@@ -1,7 +1,11 @@
 import express from 'express';
+import { body, validationResult, query } from 'express-validator';
+import fs from 'fs';
 import { BaseService } from '../services/baseService';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import FirebaseTransactionService from '../services/firebaseTransactionService';
+import { uploadDocument, handleUploadError } from '../middleware/upload';
+import { documentService } from '../services/documentService';
 
 const router = express.Router();
 const baseTransactionService = new BaseService('transactions');
@@ -270,21 +274,68 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res, next) => 
 });
 
 // Document upload endpoint
-router.post('/:id/documents', authenticateToken, async (req: AuthRequest, res, next) => {
+router.post('/:id/documents', 
+  authenticateToken, 
+  uploadDocument.single('document'),
+  handleUploadError,
+  async (req: AuthRequest, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const { source = 'files' } = req.body;
+      
+      const document = await documentService.uploadDocument(
+        req.params.id,
+        req.userId!,
+        req.file,
+        source as 'camera' | 'files' | 'drag-drop'
+      );
+
+      res.status(201).json({ 
+        message: 'Document uploaded successfully',
+        document 
+      });
+    } catch (error: any) {
+      // Clean up uploaded file if processing failed
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      next(error);
+    }
+  }
+);
+
+// Get documents for transaction
+router.get('/:id/documents', authenticateToken, async (req: AuthRequest, res, next) => {
   try {
-    // This would handle file upload with multer middleware
-    // For now, return a mock response
-    res.status(501).json({ error: 'Document upload not yet implemented' });
+    const documents = await documentService.getTransactionDocuments(
+      req.params.id, 
+      req.userId!
+    );
+    
+    res.json({ documents });
   } catch (error) {
     next(error);
   }
 });
 
-// Get documents for transaction
-router.get('/:id/documents', authenticateToken, async (req: AuthRequest, res, next) => {
+// Download document
+router.get('/:id/documents/:docId/download', authenticateToken, async (req: AuthRequest, res, next) => {
   try {
-    // This would fetch documents for the transaction
-    res.json({ documents: [] });
+    const { filePath, filename } = await documentService.downloadDocument(
+      req.params.id,
+      req.params.docId,
+      req.userId!
+    );
+
+    res.download(filePath, filename, (err) => {
+      if (err) {
+        console.error('Download error:', err);
+        next(err);
+      }
+    });
   } catch (error) {
     next(error);
   }
@@ -293,7 +344,12 @@ router.get('/:id/documents', authenticateToken, async (req: AuthRequest, res, ne
 // Delete document
 router.delete('/:id/documents/:docId', authenticateToken, async (req: AuthRequest, res, next) => {
   try {
-    // This would delete the specific document
+    await documentService.deleteDocument(
+      req.params.id,
+      req.params.docId,
+      req.userId!
+    );
+    
     res.json({ message: 'Document deleted successfully' });
   } catch (error) {
     next(error);
