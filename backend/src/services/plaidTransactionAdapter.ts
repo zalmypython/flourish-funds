@@ -144,12 +144,3 @@ export class PlaidTransactionAdapter {
     });
   }
 }
-
-// Add to Transaction type for Plaid tracking
-declare module '../../../src/types' {
-  interface Transaction {
-    plaidTransactionId?: string;
-    plaidAccountId?: string;
-    bankConnectionId?: string;
-  }
-}

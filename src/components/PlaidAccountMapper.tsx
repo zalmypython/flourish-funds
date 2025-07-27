@@ -61,13 +61,24 @@ export const PlaidAccountMapper: React.FC<PlaidAccountMapperProps> = ({
   const { user } = useApiAuth();
   
   const apiClient = {
-    get: (url: string) => fetch(url).then(r => r.json()),
-    post: (url: string, data: any) => fetch(url, { 
-      method: 'POST', 
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    }).then(r => r.json()),
-    delete: (url: string) => fetch(url, { method: 'DELETE' }).then(r => r.json())
+    get: async (url: string) => {
+      const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      return { data: await response.json() };
+    },
+    post: async (url: string, data: any) => {
+      const response = await fetch(url, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return { data: await response.json() };
+    },
+    delete: async (url: string) => {
+      const response = await fetch(url, { method: 'DELETE' });
+      return { data: await response.json() };
+    }
   };
 
   // Filter to credit accounts only

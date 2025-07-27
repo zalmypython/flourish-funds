@@ -5,6 +5,9 @@ import { useBankConnections } from '@/hooks/useBankConnections';
 import { useToast } from '@/hooks/use-toast';
 import { TransactionList } from '@/components/TransactionList';
 import { PlaidLinkButton } from '@/components/PlaidLinkButton';
+import { PlaidAccountMapper } from '@/components/PlaidAccountMapper';
+import { useFirestore } from '@/hooks/useFirestore';
+import { CreditCard as CreditCardType } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,8 +53,12 @@ export const PlaidTransactions = () => {
     getTotalBalance,
   } = useBankConnections();
 
+  // Get credit cards for mapping
+  const { documents: creditCards } = useFirestore<CreditCardType>('credit-cards');
+
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedTimeRange, setSelectedTimeRange] = useState('30');
+  const [showMapper, setShowMapper] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -273,6 +280,7 @@ export const PlaidTransactions = () => {
           <TabsList>
             <TabsTrigger value="transactions">All Transactions</TabsTrigger>
             <TabsTrigger value="connections">Bank Connections</TabsTrigger>
+            <TabsTrigger value="mapping">Reward Integration</TabsTrigger>
             <TabsTrigger value="sync-logs">Sync History</TabsTrigger>
           </TabsList>
           
@@ -340,6 +348,34 @@ export const PlaidTransactions = () => {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="mapping" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Credit Card Reward Integration</CardTitle>
+                <CardDescription>
+                  Link your Plaid credit card accounts to your credit cards to automatically calculate rewards and track bonuses
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PlaidAccountMapper
+                  bankAccounts={connections.flatMap(conn => 
+                    conn.accounts.map(acc => ({
+                      ...acc,
+                      institutionName: conn.institutionName
+                    }))
+                  )}
+                  creditCards={creditCards}
+                  onMappingCreated={() => {
+                    toast({
+                      title: "Integration Updated",
+                      description: "Your credit card reward integration has been updated. Future transactions will automatically calculate rewards!",
+                    });
+                  }}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="sync-logs" className="space-y-4">

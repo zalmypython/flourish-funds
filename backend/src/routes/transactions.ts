@@ -72,6 +72,38 @@ router.post('/sync', authenticateToken, async (req: AuthRequest, res, next) => {
   }
 });
 
+// Get Plaid transactions only
+router.get('/plaid', authenticateToken, async (req: AuthRequest, res, next) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 50, 
+      category, 
+      startDate, 
+      endDate, 
+      accountId,
+      type 
+    } = req.query;
+    
+    const plaidTransactions = await plaidTransactionService.getUserTransactions(
+      req.userId!,
+      {
+        page: Number(page),
+        limit: Number(limit),
+        category: category as string,
+        startDate: startDate as string,
+        endDate: endDate as string,
+        accountId: accountId as string,
+        type: type as 'income' | 'expense'
+      }
+    );
+    
+    res.json({ transactions: plaidTransactions });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Get all transactions (manual + Plaid imported)
 router.get('/', authenticateToken, async (req: AuthRequest, res, next) => {
   try {

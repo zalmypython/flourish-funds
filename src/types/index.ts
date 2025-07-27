@@ -32,6 +32,10 @@ export interface Transaction extends BaseDocument {
     latitude: number;
     longitude: number;
   };
+  // Plaid integration fields
+  plaidTransactionId?: string;
+  plaidAccountId?: string;
+  bankConnectionId?: string;
 }
 
 export interface TransactionCategory {
